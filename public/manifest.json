@@ -1,0 +1,22 @@
+{
+  "name": "Eladma - Shop & Save",
+  "short_name": "Eladma",
+  "description": "Plateforme e-commerce moderne pour le commerce mondial avec IA.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#e11d48",
+  "icons": [
+    {
+      "src": "https://picsum.photos/seed/eladma-icon/192/192",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://picsum.photos/seed/eladma-icon/512/512",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

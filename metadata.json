@@ -1,0 +1,5 @@
+{
+  "name": "Eladma",
+  "description": "A modern e-commerce platform for global trade, featuring AI-powered product discovery and a seamless shopping experience.",
+  "requestFramePermissions": ["camera", "geolocation", "microphone"]
+}
