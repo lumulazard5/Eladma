@@ -20,6 +20,7 @@ export interface Product {
   sellerTrustScore?: number;
   isCertified?: boolean;
   seller?: string;
+  brand?: string;
 }
 
 export interface CartItem extends Product {
@@ -34,6 +35,7 @@ export interface ProductFilters {
   localOnly: boolean;
   certifiedOnly: boolean;
   seller: string;
+  brand?: string;
   favoritesOnly?: boolean;
 }
 

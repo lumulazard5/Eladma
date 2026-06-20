@@ -29,6 +29,8 @@ import { haptics } from '../services/haptics';
 import { sounds } from '../services/sound';
 import { useLanguage } from '../context/LanguageContext';
 import { useCurrency } from '../context/CurrencyContext';
+import { translationCache } from '../services/gemini';
+import { getGoogleAccessToken } from '../services/googleChat';
 
 interface CheckoutProps {
   cart: CartItem[];
@@ -161,10 +163,295 @@ export const ELADMA_PICKUP_POINTS: PickupPoint[] = [
   { id: 'hub_kolwezi', name: 'Relais Distrib Kolwezi', address: 'Avenue de la Mine', city: 'Kolwezi', province: 'Lualaba', commune: 'Dilala', quartier: 'Dilala', zipCode: '31001', lat: -10.7167, lon: 25.4667 }
 ];
 
+const localTranslations: Record<string, Record<string, string>> = {
+  fr: {
+    backToCart: "Retour au panier",
+    deliveryMode: "Mode de livraison en RDC",
+    homeDelivery: "Livraison à domicile",
+    gpsCalculated: "Frais calculés via GPS",
+    pickupRelay: "Retrait Point Relais",
+    freeLogistics: "Coût logistique : 0 $",
+    nearestRelays: "Points de retrait les plus proches (RDC)",
+    sortedByDistance: "Triés par distance",
+    closest: "Plus proche",
+    recalculatedGps: "Les distances sont recalculées en temps réel selon la méthode de re-calcul GPS (Hub de Kananga, Kinshasa, Lubumbashi...). Cliquez sur un relais pour l'affecter.",
+    rdcProvince: "Province de la RDC",
+    provinceListDesc: "sélectionnez l'une des 26 provinces",
+    town: "Ville / Chef-lieu",
+    zipCode: "Code Postal ou ID Zone",
+    commune: "Commune / Territoire",
+    quartier: "Quartier / Avenue",
+    landmark: "Localité / Point de repère",
+    landmarkPlaceholder: "Optionnel (Ex: Près de l'église, Marché...)",
+    streetAddress: "Adresse physique (Numéro / Rue)",
+    previous: "Précédent",
+    continueSummary: "Continuer vers le récapitulatif",
+    confirmPay: "Confirmer et payer",
+    finalizePayment: "Finaliser le paiement de",
+    summary: "Récapitulatif",
+    subtotal: "Sous-total",
+    delivery: "Livraison",
+    free: "Gratuite",
+    total: "Total",
+    paymentRequiredCdf: "Paiement requis en CDF",
+    currencyNotice: "* La monnaie de paiement acceptée sur Eladma est le Franc Congolais (CDF). Votre montant est converti automatiquement.",
+    paymentSecure: "Paiement Sécurisé",
+    momoOperatorTitle: "Opérateur Mobile de confiance",
+    rdcPhoneNumber: "Numéro de Téléphone RDC",
+    momoPhoneDesc: "Saisissez votre numéro actif lié à votre compte Mobile Money pour la transaction de secours.",
+    momoProtectionTitle: "Protection USSD Eladma Security",
+    momoProtectionDesc: "Une simulation interactive sécurisée d'accord Pin USSD de virement s'affichera au déclenchement. Aucune carte bancaire requise.",
+    creditCardTitle: "Paiement par Carte de Crédit",
+    cardNumber: "Numéro de Carte",
+    validity: "Validité",
+    cvv: "CVV",
+    encryptionNotice: "Vos informations sont chiffrées et sécurisées par Eladma Pay.",
+    emptyCartTitle: "Votre panier est vide",
+    backShopping: "Retour aux achats",
+    processingOrder: "Traitement de votre commande...",
+    backToShop: "Retourner à la boutique",
+    directHubDelivery: "Livraison Hub Direct Eladma",
+    directHubDesc: "Votre commande sera acheminée de manière sécurisée directement au relais.",
+    freeLabel: "Gratuit",
+    directHubDelay: "Délai de mise à disposition : 1 à 3 jours ouvrés.",
+    shippedTo: "Expédié à",
+    shippingMethod: "Méthode de livraison",
+    items: "Articles",
+    totalToPay: "Total à payer",
+    conversionRequired: "Conversion requise en Franc Congolais (CDF)",
+    verifyNotice: "Veuillez vérifier vos informations avant de passer au paiement sécurisé.",
+    ussdActiveService: "Service USSD Actif",
+    ussdPinTitle: "Paiement Mobile RDC",
+    ussdPinConfirmDesc: "Confirmez le transfert de",
+    ussdPinConvertDesc: "(Montant original de {amount} converti en Francs Congolais en raison de l'acceptation exclusive du CDF sur Eladma)",
+    ussdPinInputText: "Saisissez votre PIN",
+    secWarning: "⚠️ Sécurité : Caractères interdits ou scripts malveillants interceptés dans le formulaire.",
+    secEmailFormat: "⚠️ Sécurité : Format d'adresse e-mail invalide.",
+    secRateWarning: "Trop de tentatives. Veuillez patienter.",
+    successTitleOrder: "Commande réussie !",
+    successDescOrder: "Commande enregistrée. Points de récompense ajoutés !",
+    deliveryHomeDesc: "Frais calculés via GPS",
+    deliveryPickupDesc: "Frais logistiques offerts",
+    recalculatedHint: "Calculé pour %km km du distributeur",
+  },
+  en: {
+    backToCart: "Back to cart",
+    deliveryMode: "Delivery Mode in DRC",
+    homeDelivery: "Home Delivery",
+    gpsCalculated: "Fees calculated via GPS",
+    pickupRelay: "Pickup Relay",
+    freeLogistics: "Logistics cost: 0 $",
+    nearestRelays: "Nearest Pick-up Points (DRC)",
+    sortedByDistance: "Sorted by distance",
+    closest: "Closest",
+    recalculatedGps: "Distances are recalculated in real time based on GPS calculation (Kananga Hub, Kinshasa, Lubumbashi...). Click on a relay to assign it.",
+    rdcProvince: "Province of DRC",
+    provinceListDesc: "select one of the 26 provinces",
+    town: "City / Town",
+    zipCode: "Zip Code or Zone ID",
+    commune: "Commune / Territory",
+    quartier: "Quartier / Avenue",
+    landmark: "Location / Landmark",
+    landmarkPlaceholder: "Optional (e.g. Near church, Market...)",
+    streetAddress: "Physical Address (Number / Street)",
+    previous: "Previous",
+    continueSummary: "Continue to summary",
+    confirmPay: "Confirm and pay",
+    finalizePayment: "Finalize payment of",
+    summary: "Summary",
+    subtotal: "Subtotal",
+    delivery: "Delivery",
+    free: "Free",
+    total: "Total",
+    paymentRequiredCdf: "Payment required in CDF",
+    currencyNotice: "* The accepted payment currency on Eladma is the Congolese Franc (CDF). Your amount is converted automatically.",
+    paymentSecure: "Secure Payment",
+    momoOperatorTitle: "Trusted Mobile Operator",
+    rdcPhoneNumber: "DRC Phone Number",
+    momoPhoneDesc: "Enter your active number linked to your Mobile Money account for the backup transaction.",
+    momoProtectionTitle: "USSD Protection Eladma Security",
+    momoProtectionDesc: "A secure interactive simulation of USSD transfer agreement PIN will be displayed when triggered. No bank card required.",
+    creditCardTitle: "Payment by Credit Card",
+    cardNumber: "Card Number",
+    validity: "Validity",
+    cvv: "CVV",
+    encryptionNotice: "Your details are encrypted and secured by Eladma Pay.",
+    emptyCartTitle: "Your cart is empty",
+    backShopping: "Back to shopping",
+    processingOrder: "Processing your order...",
+    backToShop: "Back to shop",
+    directHubDelivery: "Eladma Direct Hub Delivery",
+    directHubDesc: "Your order will be securely routed directly to the relay.",
+    freeLabel: "Free",
+    directHubDelay: "Availability time: 1 to 3 business days.",
+    shippedTo: "Shipped to",
+    shippingMethod: "Shipping Method",
+    items: "Items",
+    totalToPay: "Total to pay",
+    conversionRequired: "Required conversion in Congolese Franc (CDF)",
+    verifyNotice: "Please verify your information before proceeding to secure payment.",
+    ussdActiveService: "Active USSD Service",
+    ussdPinTitle: "RDC Mobile Payment",
+    ussdPinConfirmDesc: "Confirm transfer of",
+    ussdPinConvertDesc: "(Original amount of {amount} converted to Congolese Francs due to exclusive acceptance of CDF on Eladma)",
+    ussdPinInputText: "Enter your PIN",
+    secWarning: "⚠️ Security: Forbidden characters or malicious scripts intercepted in the form.",
+    secEmailFormat: "⚠️ Security: Invalid email address format.",
+    secRateWarning: "Too many attempts. Please wait.",
+    successTitleOrder: "Order successful!",
+    successDescOrder: "Order saved successfully. Reward points added!",
+    deliveryHomeDesc: "Fees calculated via GPS",
+    deliveryPickupDesc: "Free logistics",
+    recalculatedHint: "Calculated for %km km from distributor",
+  },
+  ln: {
+    backToCart: "Zonga na likanza",
+    deliveryMode: "Ndenge ya kozwa biloko na RDC",
+    homeDelivery: "Koya na ndaku ndako",
+    gpsCalculated: "Talo na kotala GPS",
+    pickupRelay: "Kozwela na Point Relais",
+    freeLogistics: "Talo ya motamboli : 0 $",
+    nearestRelays: "Mabesé ya kozwela penepene (RDC)",
+    sortedByDistance: "Na molongo ya penepene",
+    closest: "Penepene koleka",
+    recalculatedGps: "Bokaboli eponami lisusu na mbala moko na nsinga ya GPS (Kananga, Kinshasa, Lubumbashi...). Finá mabelé moko mpo na kopona.",
+    rdcProvince: "Etuka ya Congo (RDC)",
+    provinceListDesc: "poná etuka moko na nkama mibale na motoba",
+    town: "Mboka-mokonzi / Etuka",
+    zipCode: "Kod mpo ya posita to ID Zone",
+    commune: "Komini / Teritware",
+    quartier: "Karié / Avenue",
+    landmark: "Esika to Elembo ya ndako",
+    landmarkPlaceholder: "Ofandeli mpembeni (Pene na ndako ya Nzambe, Wenzé...)",
+    streetAddress: "Nimero mpe Nzela ofandi",
+    previous: "Zonga sima",
+    continueSummary: "Kende na kosukisa",
+    confirmPay: "Ndimisa mpe futá",
+    finalizePayment: "Silisa bofuti ya",
+    summary: "Kosukisa nyonso",
+    subtotal: "Sous-total",
+    delivery: "Motamboli",
+    free: "Ofele",
+    total: "Talo nyonso",
+    paymentRequiredCdf: "Bofuti na Franc Congolais (CDF)",
+    currencyNotice: "* Mbongo ya ndimo na Eladma eza Franc Congolais (CDF). Mbongo na yo ebongwani mbala moko.",
+    paymentSecure: "Bofuti na bokengi",
+    momoOperatorTitle: "Motandoli ya bokengi ya telefone",
+    rdcPhoneNumber: "Nimero ya telefone RDC",
+    momoPhoneDesc: "Komá nimero na yo ya telefone mpo ya bofuti ya Mobile Money.",
+    momoProtectionTitle: "Bokengi ya kode USSD na Eladma",
+    momoProtectionDesc: "Lisano ya bosembo ya kokoma PIN USSD ekoya mbala moko na ndambo ya bofuti. Karte ya banki esengeli te.",
+    creditCardTitle: "Bofuti na Karte ya Banki",
+    cardNumber: "Nimero ya Karte",
+    validity: "Mikolo ya bokengi",
+    cvv: "CVV",
+    encryptionNotice: "Sango na yo ebombami malamu mpenza na Eladma Pay.",
+    emptyCartTitle: "Likanza na yo eza pamba",
+    backShopping: "Zonga kosomba biloko",
+    processingOrder: "Azali boye kosala bosombi...",
+    backToShop: "Zonga na wenzé",
+    directHubDelivery: "Motindeli ya mbala moko ya Eladma",
+    directHubDesc: "Bosombi na yo ekotindama na bokengi mpenza na Point Relais.",
+    freeLabel: "Ofele",
+    directHubDelay: "Ekozala mpo ya kozwa: mikolo 1 tii 3.",
+    shippedTo: "Etindami epai ya",
+    shippingMethod: "Ndenge ya komema",
+    items: "Biloko",
+    totalToPay: "Talo ya kofuta",
+    conversionRequired: "Kobongola esengeli na Franc Congolais (CDF)",
+    verifyNotice: "Meka kotala sango na yo malamu yambo otia motema na kofuta.",
+    ussdActiveService: "Kode USSD ezali kosala",
+    ussdPinTitle: "Bofuti na Telefone na RDC",
+    ussdPinConfirmDesc: "Ndimisa kotinda mbongo ya",
+    ussdPinConvertDesc: "(Talo ya yambo {amount} ebongwani na Franc Congolais mpo eladma emelaka kaka CDF)",
+    ussdPinInputText: "Komá PIN na yo",
+    secWarning: "⚠️ Bokengi : Makambo ekangami to biloko mabe emonani na formulaire.",
+    secEmailFormat: "⚠️ Bokengi : Email eza malamu te.",
+    secRateWarning: "Omezi mbala mingi. Zila moke.",
+    successTitleOrder: "Bosombi elongi !",
+    successDescOrder: "Bosombi ekomami malamu. Matabisi ebakisami !",
+    deliveryHomeDesc: "Talo etangami na GPS",
+    deliveryPickupDesc: "Mosala ya motamboli ofele",
+    recalculatedHint: "Etangami mpo ya kilomẹtɛ %km",
+  },
+  sw: {
+    backToCart: "Rudi kwenye kikapu",
+    deliveryMode: "Njia ya Uwasilishaji katika RDC",
+    homeDelivery: "Kufikishwa nyumbani",
+    gpsCalculated: "Gharama zilizohesabiwa kupitia GPS",
+    pickupRelay: "Kuchukulia Point Relais",
+    freeLogistics: "Gharama ya usafirishaji : 0 $",
+    nearestRelays: "Vituo vya karibu vya kuchukulia bidhaa (RDC)",
+    sortedByDistance: "Kupangwa kwa umbali",
+    closest: "Karibu zaidi",
+    recalculatedGps: "Umbali unahesabiwa tena kwa wakati halisi kulingana na njia ya GPS (Kananga Hub, Kinshasa, Lubumbashi...). Bonyeza kwenye kituo ili kuchagua.",
+    rdcProvince: "Mkoa wa RDC",
+    provinceListDesc: "chagua mkoa mmoja kati ya 26",
+    town: "Mji / Makao Maku",
+    zipCode: "Nambari ya Posta au ID ya Eneo",
+    commune: "Wilaya / Eneo",
+    quartier: "Mtaa / Njia",
+    landmark: "Mahali / Alama ya karibu",
+    landmarkPlaceholder: "Hiari (Mfano: Karibu na canisa, Soko...)",
+    streetAddress: "Anwani ya kawaida (Nambari / Barabara)",
+    previous: "Rudi nyuma",
+    continueSummary: "Endelea kwenye muhtasari",
+    confirmPay: "Thibitisha na ulipe",
+    finalizePayment: "Kumaliza malipo ya",
+    summary: "Muhtasari",
+    subtotal: "Nusu-jumla",
+    delivery: "Usafirishaji",
+    free: "Bure",
+    total: "Jumla",
+    paymentRequiredCdf: "Malipo yanahitajika kwa CDF",
+    currencyNotice: "* Sarafu ya malipo inayokubalika kwenye Eladma ni Franc ya DRC (CDF). Kiasi chako kinabadilishwa kiotomatiki.",
+    paymentSecure: "Malipo salama",
+    momoOperatorTitle: "Mwendeshaji wa Mtandao wa simu wa kuaminika",
+    rdcPhoneNumber: "Nambari ya Simu ya RDC",
+    momoPhoneDesc: "Weka nambari yako inayofanya kazi inayohusishwa na akaunti yako ya Mobile Money kwa malipo ya dharura.",
+    momoProtectionTitle: "Ulinzi wa USSD Eladma Security",
+    momoProtectionDesc: "Uigaji salama shirikishi wa PIN ya makubaliano ya kuhamisha USSD utaonyeshwa ukianzishwa. Hakuna kadi ya benki inahitajika.",
+    creditCardTitle: "Malipo kwa Kadi ya Mkopo",
+    cardNumber: "Nambari ya Kadi",
+    validity: "Muda wa Kazi",
+    cvv: "CVV",
+    encryptionNotice: "Maelezo yako yamesimbwa kwa njia fiche na kulindwa na Eladma Pay.",
+    emptyCartTitle: "Kikapu chako kiko wazi",
+    backShopping: "Rudi kwenye ununuzi",
+    processingOrder: "Inashughulikia agizo lako...",
+    backToShop: "Rudisha kwenye duka",
+    directHubDelivery: "Uwasilishaji wa kituo cha moja kwa moja cha Eladma",
+    directHubDesc: "Agizo lako litatumwa kwa usalama moja kwa moja kwenye kituo cha kuchukulia.",
+    freeLabel: "Bure",
+    directHubDelay: "Muda wa kupatikana: Siku 1 hadi 3 za kazi.",
+    shippedTo: "Kutunukiwa kwa",
+    shippingMethod: "Njia ya usafirishaji",
+    items: "Bidhaa",
+    totalToPay: "Jumla ya kulipa",
+    conversionRequired: "Mabadilike ya lazima kwa Franc ya Kongo (CDF)",
+    verifyNotice: "Tafadhali thibitisha maelezo yako kabla ya kuendelea na malipo salama.",
+    ussdActiveService: "Huduma ya USSD Inafanya Kazi",
+    ussdPinTitle: "Malipo ya Simu ya RDC",
+    ussdPinConfirmDesc: "Thibitisha uhamisho wa",
+    ussdPinConvertDesc: "(Kiasi cha asili cha {amount} kimebadilishwa kuwa Francs za Kongo kutokana na kukubali CDF pekee kwenye Eladma)",
+    ussdPinInputText: "Weka PIN yako",
+    secWarning: "⚠️ Usalama: Herufi zilizopigwa marufuku au hati hasidi zimezuiliwa kwenye fomu.",
+    secEmailFormat: "⚠️ Usalama: Anwani ya barua pepe isiyo sahihi.",
+    secRateWarning: "Majaribio mengi sana. Tafadhali subiri.",
+    successTitleOrder: "Agizo limefanikiwa!",
+    successDescOrder: "Agizo limehifadhiwa vizuri. Pointi za zawadi zimeongezwa!",
+    deliveryHomeDesc: "Gharama zilizohesabiwa kupitia GPS",
+    deliveryPickupDesc: "Gharama za usafirishaji za bure",
+    recalculatedHint: "Imehesabiwa kwa km %km kutoka kwa mtoaji",
+  }
+};
+
 export const Checkout: React.FC<CheckoutProps> = ({ cart, onBack, onClearCart, onOrderSuccess }) => {
   const { t, language } = useLanguage();
-  const { formatPrice } = useCurrency();
+  const lt = localTranslations[language] || localTranslations['fr'];
+  const { formatPrice, currency, exchangeRates } = useCurrency();
   const [step, setStep] = useState(1);
+  const [notifyChat, setNotifyChat] = useState(true);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -362,6 +649,37 @@ export const Checkout: React.FC<CheckoutProps> = ({ cart, onBack, onClearCart, o
       shippingAddress: finalAddress
     });
 
+    // Google Chat Order Notification dispatch logic
+    if (notifyChat) {
+      const chatToken = getGoogleAccessToken();
+      if (chatToken) {
+        (async () => {
+          try {
+            const { fetchSpaces, sendChatMessage } = await import('../services/googleChat');
+            const spaces = await fetchSpaces();
+            if (spaces && spaces.length > 0) {
+              const targetSpace = spaces.find(s => s.displayName.toLowerCase().includes('eladma')) || spaces[0];
+              const itemsText = cart.map(item => `   • ${item.name} (x${item.quantity})`).join('\n');
+              const finalCostText = currency === 'USD' ? `$${total.toFixed(2)}` : `${(total * 2850).toLocaleString()} FC`;
+
+              const notificationText = `🛍️ **Nouvelle commande sur Eladma RDC !**\n\n` +
+                `🔔 **Commande :** #${newOrder.id}\n` +
+                `👤 **Client :** ${formData.name}\n` +
+                `📍 **Livraison :** ${finalAddress}\n\n` +
+                `🛒 **Articles de la commande :**\n${itemsText}\n\n` +
+                `💰 **Montant total :** **${finalCostText}**\n` +
+                `🚚 **Statut :** En attente de livraison (${selectedProvince})`;
+
+              await sendChatMessage(targetSpace.name, notificationText);
+              toast.success('Notification de commande envoyée à votre salon Google Chat !');
+            }
+          } catch (chatErr: any) {
+            console.error('Failed to notify Google Chat:', chatErr);
+          }
+        })();
+      }
+    }
+
     // Simulate order processing
     const loadingToast = toast.loading('Traitement de votre commande...');
     setTimeout(() => {
@@ -473,12 +791,12 @@ export const Checkout: React.FC<CheckoutProps> = ({ cart, onBack, onClearCart, o
         <div className="w-20 h-20 bg-zinc-100 dark:bg-zinc-800 rounded-full flex items-center justify-center mx-auto mb-6">
           <Truck className="w-10 h-10 text-zinc-400" />
         </div>
-        <h2 className="text-2xl font-bold dark:text-white mb-4">Votre panier est vide</h2>
+        <h2 className="text-2xl font-bold dark:text-white mb-4">{lt.emptyCartTitle}</h2>
         <button 
           onClick={onBack}
           className="bg-brand text-white px-8 py-3 rounded-xl font-bold hover:bg-brand-dark transition-all"
         >
-          Retour aux achats
+          {lt.backShopping}
         </button>
       </div>
     );
@@ -491,7 +809,7 @@ export const Checkout: React.FC<CheckoutProps> = ({ cart, onBack, onClearCart, o
         className="flex items-center gap-2 text-zinc-500 hover:text-brand mb-8 transition-colors group"
       >
         <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-        Retour au panier
+        {lt.backToCart}
       </button>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
@@ -572,7 +890,7 @@ export const Checkout: React.FC<CheckoutProps> = ({ cart, onBack, onClearCart, o
 
                 {/* Delivery Type Selector */}
                 <div className="space-y-3 pt-2">
-                  <label className="text-xs font-black text-zinc-500 uppercase tracking-wider block">Mode de livraison en RDC</label>
+                  <label className="text-xs font-black text-zinc-500 uppercase tracking-wider block">{lt.deliveryMode}</label>
                   <div className="grid grid-cols-2 gap-4 bg-zinc-100 dark:bg-zinc-800/60 p-1.5 rounded-2xl border border-zinc-200/50 dark:border-zinc-700/50">
                     <button
                       type="button"
@@ -585,8 +903,8 @@ export const Checkout: React.FC<CheckoutProps> = ({ cart, onBack, onClearCart, o
                     >
                       <Truck className="w-4 h-4 shrink-0" />
                       <div className="text-center sm:text-left">
-                        <span className="block text-xs font-bold">Livraison à domicile</span>
-                        <span className="block text-[9px] font-normal opacity-70">Frais calculés via GPS</span>
+                        <span className="block text-xs font-bold">{lt.homeDelivery}</span>
+                        <span className="block text-[9px] font-normal opacity-70">{lt.gpsCalculated}</span>
                       </div>
                     </button>
                     <button
@@ -600,8 +918,8 @@ export const Checkout: React.FC<CheckoutProps> = ({ cart, onBack, onClearCart, o
                     >
                       <MapPin className="w-4 h-4 shrink-0" />
                       <div className="text-center sm:text-left">
-                        <span className="block text-xs font-bold font-semibold">Retrait Point Relais</span>
-                        <span className="block text-[9px] font-normal text-brand opacity-90">Coût logistique : 0 $</span>
+                        <span className="block text-xs font-bold font-semibold">{lt.pickupRelay}</span>
+                        <span className="block text-[9px] font-normal text-brand opacity-90">{lt.freeLogistics}</span>
                       </div>
                     </button>
                   </div>
@@ -617,68 +935,68 @@ export const Checkout: React.FC<CheckoutProps> = ({ cart, onBack, onClearCart, o
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <MapPin className="w-4 h-4 text-brand animate-bounce" />
-                        <h3 className="text-xs font-bold uppercase text-zinc-500 tracking-wider">Points de retrait les plus proches (RDC)</h3>
+                        <h3 className="text-xs font-bold uppercase text-zinc-500 tracking-wider">{lt.nearestRelays}</h3>
                       </div>
                       <span className="text-[10px] bg-brand/10 border border-brand/25 text-brand font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-                        Triés par distance
+                        {lt.sortedByDistance}
                       </span>
                     </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      {sortedPickupPoints.slice(0, 3).map((point, index) => {
-                        const isSelected = selectedPickupPointId === point.id;
-                        return (
-                          <div
-                            key={point.id}
-                            onClick={() => handleSelectPickupPoint(point.id)}
-                            className={`p-3 rounded-xl border-2 cursor-pointer transition-all flex flex-col justify-between h-full relative ${
-                              isSelected
-                                ? 'border-brand bg-brand/5 dark:bg-brand/10 shadow-sm'
-                                : 'border-zinc-200/60 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 hover:border-zinc-300 dark:hover:border-zinc-700'
-                            }`}
-                          >
-                            {index === 0 && (
-                              <div className="absolute -top-2.5 -right-2 bg-emerald-600 text-white text-[8px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">
-                                Plus proche
-                              </div>
-                            )}
-                            <div>
-                              <div className="flex items-center gap-1.5 mb-1.5">
-                                <span className="text-[10px] font-bold text-zinc-450 font-mono">#{index + 1}</span>
-                                <h4 className="text-xs font-extrabold text-zinc-800 dark:text-zinc-200 line-clamp-1">{point.name}</h4>
-                              </div>
-                              <p className="text-[10px] text-zinc-500 dark:text-zinc-400 line-clamp-2 leading-relaxed mb-1.5">
-                                {point.address}, {point.city}
-                              </p>
-                            </div>
-                            <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800/80 mt-auto flex items-center justify-between">
-                              <span className="text-[10px] font-black text-brand bg-brand/5 px-2 py-0.5 rounded-md font-mono shrink-0">
-                                {point.distanceToUser} km
-                              </span>
-                              <span className="text-[9px] text-zinc-400 uppercase font-semibold">
-                                {point.city}
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    <div className="text-[10px] text-zinc-500 dark:text-zinc-400 bg-brand/5 dark:bg-brand/10 border border-brand/5 p-2.5 rounded-xl leading-relaxed flex items-center gap-2">
-                      <Compass className="w-3.5 h-3.5 text-brand shrink-0" />
-                      <span>
-                        Les distances sont recalculées en temps réel selon la méthode de re-calcul GPS (Hub de Kananga, Kinshasa, Lubumbashi...). Cliquez sur un relais pour l'affecter.
-                      </span>
-                    </div>
-                  </motion.div>
-                )}
-
-                {/* RDC Province Selector */}
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-zinc-500 uppercase tracking-wide flex justify-between">
-                    <span>Province de la RDC</span>
-                    <span className="text-[10px] text-brand lowercase font-normal">sélectionnez l'une des 26 provinces</span>
-                  </label>
+ 
+                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                       {sortedPickupPoints.slice(0, 3).map((point, index) => {
+                         const isSelected = selectedPickupPointId === point.id;
+                         return (
+                           <div
+                             key={point.id}
+                             onClick={() => handleSelectPickupPoint(point.id)}
+                             className={`p-3 rounded-xl border-2 cursor-pointer transition-all flex flex-col justify-between h-full relative ${
+                               isSelected
+                                 ? 'border-brand bg-brand/5 dark:bg-brand/10 shadow-sm'
+                                 : 'border-zinc-200/60 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 hover:border-zinc-300 dark:hover:border-zinc-700'
+                             }`}
+                           >
+                             {index === 0 && (
+                               <div className="absolute -top-2.5 -right-2 bg-emerald-600 text-white text-[8px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">
+                                 {lt.closest}
+                               </div>
+                             )}
+                             <div>
+                               <div className="flex items-center gap-1.5 mb-1.5">
+                                 <span className="text-[10px] font-bold text-zinc-450 font-mono">#{index + 1}</span>
+                                 <h4 className="text-xs font-extrabold text-zinc-800 dark:text-zinc-200 line-clamp-1">{point.name}</h4>
+                               </div>
+                               <p className="text-[10px] text-zinc-500 dark:text-zinc-400 line-clamp-2 leading-relaxed mb-1.5">
+                                 {point.address}, {point.city}
+                               </p>
+                             </div>
+                             <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800/80 mt-auto flex items-center justify-between">
+                               <span className="text-[10px] font-black text-brand bg-brand/5 px-2 py-0.5 rounded-md font-mono shrink-0">
+                                 {point.distanceToUser} km
+                               </span>
+                               <span className="text-[9px] text-zinc-400 uppercase font-semibold">
+                                 {point.city}
+                               </span>
+                             </div>
+                           </div>
+                         );
+                       })}
+                     </div>
+ 
+                     <div className="text-[10px] text-zinc-500 dark:text-zinc-400 bg-brand/5 dark:bg-brand/10 border border-brand/5 p-2.5 rounded-xl leading-relaxed flex items-center gap-2">
+                       <Compass className="w-3.5 h-3.5 text-brand shrink-0" />
+                       <span>
+                         {lt.recalculatedGps}
+                       </span>
+                     </div>
+                   </motion.div>
+                 )}
+ 
+                 {/* RDC Province Selector */}
+                 <div className="space-y-1">
+                   <label className="text-xs font-bold text-zinc-500 uppercase tracking-wide flex justify-between">
+                     <span>{lt.rdcProvince}</span>
+                     <span className="text-[10px] text-brand lowercase font-normal">{lt.provinceListDesc}</span>
+                   </label>
                   <select
                     value={selectedProvince}
                     onChange={(e) => handleProvinceChange(e.target.value)}
@@ -694,7 +1012,7 @@ export const Checkout: React.FC<CheckoutProps> = ({ cart, onBack, onClearCart, o
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-zinc-500 uppercase">Ville / Chef-lieu</label>
+                    <label className="text-xs font-bold text-zinc-500 uppercase">{lt.town}</label>
                     <input 
                       type="text" required
                       value={formData.city}
@@ -704,7 +1022,7 @@ export const Checkout: React.FC<CheckoutProps> = ({ cart, onBack, onClearCart, o
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-zinc-500 uppercase">Code Postal ou ID Zone</label>
+                    <label className="text-xs font-bold text-zinc-500 uppercase">{lt.zipCode}</label>
                     <input 
                       type="text" required
                       value={formData.zipCode}
@@ -717,7 +1035,7 @@ export const Checkout: React.FC<CheckoutProps> = ({ cart, onBack, onClearCart, o
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-zinc-500 uppercase">Commune / Territoire</label>
+                    <label className="text-xs font-bold text-zinc-500 uppercase">{lt.commune}</label>
                     <input 
                       type="text" required
                       value={commune}
@@ -727,7 +1045,7 @@ export const Checkout: React.FC<CheckoutProps> = ({ cart, onBack, onClearCart, o
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-zinc-500 uppercase">Quartier / Avenue</label>
+                    <label className="text-xs font-bold text-zinc-500 uppercase">{lt.quartier}</label>
                     <input 
                       type="text" required
                       value={quartier}
@@ -737,19 +1055,19 @@ export const Checkout: React.FC<CheckoutProps> = ({ cart, onBack, onClearCart, o
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-zinc-500 uppercase">Localité / Point de repère</label>
+                    <label className="text-xs font-bold text-zinc-500 uppercase">{lt.landmark}</label>
                     <input 
                       type="text"
                       value={localite}
                       onChange={(e) => setLocalite(e.target.value)}
-                      className="w-full bg-zinc-100 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-brand/20 dark:text-white"
-                      placeholder="Optionnel (Ex: Près de l'église, Marché...)"
+                      className="w-full bg-zinc-100 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-brand/20 dark:text-white font-medium placeholder:font-normal"
+                      placeholder={lt.landmarkPlaceholder}
                     />
                   </div>
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-zinc-500 uppercase">Adresse physique (Numéro / Rue)</label>
+                  <label className="text-xs font-bold text-zinc-500 uppercase">{lt.streetAddress}</label>
                   <input 
                     type="text" required
                     value={formData.address}
@@ -768,14 +1086,14 @@ export const Checkout: React.FC<CheckoutProps> = ({ cart, onBack, onClearCart, o
                        </div>
                        <div>
                          <h4 className="text-sm font-bold text-emerald-800 dark:text-emerald-450 flex items-center gap-2">
-                           <span>Livraison Hub Direct Eladma</span>
-                           <span className="text-[9px] bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">Gratuit</span>
+                           <span>{lt.directHubDelivery}</span>
+                           <span className="text-[9px] bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">{lt.freeLabel}</span>
                          </h4>
                          <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed mt-1">
-                           Votre commande sera acheminée de manière sécurisée directement au relais <strong>{ELADMA_PICKUP_POINTS.find(p => p.id === selectedPickupPointId)?.name}</strong>. Pas de frais de douane ni de transport interne additionnel.
+                           {lt.directHubDesc} <strong>{ELADMA_PICKUP_POINTS.find(p => p.id === selectedPickupPointId)?.name}</strong>.
                          </p>
                          <p className="text-[10px] text-zinc-400 dark:text-zinc-550 mt-1.5 font-semibold">
-                           Délai de mise à disposition : 1 à 3 jours ouvrés.
+                           {lt.directHubDelay}
                          </p>
                        </div>
                      </div>
@@ -882,33 +1200,33 @@ export const Checkout: React.FC<CheckoutProps> = ({ cart, onBack, onClearCart, o
               >
                 <div className="flex items-center gap-3 mb-2">
                   <div className="w-8 h-8 bg-brand/10 text-brand rounded-full flex items-center justify-center font-bold">2</div>
-                  <h2 className="text-xl font-bold dark:text-white">Récapitulatif de la commande</h2>
+                  <h2 className="text-xl font-bold dark:text-white">{t.orderSummary}</h2>
                 </div>
 
                 <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 space-y-6 shadow-sm">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div>
-                      <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-3">Expédié à</h4>
+                      <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-3">{lt.shippedTo}</h4>
                       <p className="font-bold dark:text-white">{formData.name}</p>
                       <p className="text-zinc-500 dark:text-zinc-400 text-sm leading-relaxed">
-                        Adresse : {formData.address}<br />
-                        {quartier && <span>Quartier/Avenue : Q. {quartier}</span>} {commune && <span> • Commune : C. {commune}</span>}<br />
-                        {localite && <span>Point de repère : {localite} </span>} {formData.zipCode && <span> • B.P : {formData.zipCode}</span>}<br />
-                        <span className="font-semibold text-zinc-700 dark:text-zinc-300">Ville : {formData.city} • Province : {selectedProvince} (RDC)</span>
+                        {lt.streetAddress} : {formData.address}<br />
+                        {quartier && <span>{lt.quartier} : Q. {quartier}</span>} {commune && <span> • {lt.commune} : C. {commune}</span>}<br />
+                        {localite && <span>{lt.landmark} : {localite} </span>} {formData.zipCode && <span> • B.P : {formData.zipCode}</span>}<br />
+                        <span className="font-semibold text-zinc-700 dark:text-zinc-300">{lt.town} : {formData.city} • {lt.rdcProvince} : {selectedProvince} (RDC)</span>
                       </p>
                       <p className="text-zinc-500 dark:text-zinc-400 text-sm mt-1">{formData.email}</p>
                     </div>
                     <div>
-                      <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-3">Méthode de livraison</h4>
+                      <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-3">{lt.shippingMethod}</h4>
                       {deliveryType === 'pickup' ? (
                         <div className="flex items-center gap-3 p-3 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 rounded-xl items-start">
                           <MapPin className="w-5 h-5 text-emerald-600 mt-0.5 shrink-0 animate-pulse" />
                           <div>
-                            <p className="text-sm font-bold text-emerald-800 dark:text-emerald-400">Point Relais Eladma</p>
+                            <p className="text-sm font-bold text-emerald-800 dark:text-emerald-400">{lt.pickupRelay}</p>
                             <p className="text-xs text-zinc-700 dark:text-zinc-300 font-bold mt-0.5">
                               {ELADMA_PICKUP_POINTS.find(p => p.id === selectedPickupPointId)?.name}
                             </p>
-                            <p className="text-[10px] text-zinc-500 mt-1">Collecte libre &amp; Gratuite</p>
+                            <p className="text-[10px] text-zinc-500 mt-1">{language === 'en' ? 'Free pickup' : language === 'ln' ? 'Zonga ofele' : language === 'sw' ? 'Kusanya bure' : 'Collecte libre & Gratuite'}</p>
                           </div>
                         </div>
                       ) : (
@@ -916,8 +1234,8 @@ export const Checkout: React.FC<CheckoutProps> = ({ cart, onBack, onClearCart, o
                           {React.createElement(selectedCarrier.icon, { className: "w-5 h-5 text-brand mt-0.5 shrink-0" })}
                           <div>
                             <p className="text-sm font-bold dark:text-white">{selectedCarrier.name}</p>
-                            <p className="text-xs text-brand font-semibold">Estimé : {selectedCarrier.minDays}-{selectedCarrier.maxDays} jours</p>
-                            <p className="text-[10px] text-zinc-500 mt-0.5">Calculé pour {distance} km du distributeur ({detectedZone})</p>
+                            <p className="text-xs text-brand font-semibold">{language === 'en' ? 'Est.' : language === 'ln' ? 'Sango' : language === 'sw' ? 'Muda' : 'Estimé'} : {selectedCarrier.minDays}-{selectedCarrier.maxDays} {language === 'en' ? 'days' : language === 'ln' ? 'mikolo' : language === 'sw' ? 'siku' : 'jours'}</p>
+                            <p className="text-[10px] text-zinc-500 mt-0.5">{language === 'en' ? 'Calculated for' : language === 'ln' ? 'Mpo ya' : language === 'sw' ? 'Imehesabiwa kwa' : 'Calculé pour'} {distance} km {language === 'en' ? 'from hub' : language === 'ln' ? 'na hub' : language === 'sw' ? 'kutoka kituo' : 'du distributeur'} ({detectedZone})</p>
                           </div>
                         </div>
                       )}
@@ -925,27 +1243,41 @@ export const Checkout: React.FC<CheckoutProps> = ({ cart, onBack, onClearCart, o
                   </div>
 
                   <div className="pt-6 border-t dark:border-zinc-800">
-                    <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-4">Articles</h4>
+                    <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-4">{lt.items}</h4>
                     <div className="space-y-4">
-                      {cart.map((item) => (
-                        <div key={item.id} className="flex gap-4 items-center">
-                          <div className="w-16 h-16 rounded-xl overflow-hidden bg-zinc-100 flex-shrink-0">
-                            <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                      {cart.map((item) => {
+                        const cacheKey = `${item.id}_${language}`;
+                        const translatedName = translationCache[cacheKey]?.name || item.name;
+                        return (
+                          <div key={item.id} className="flex gap-4 items-center">
+                            <div className="w-16 h-16 rounded-xl overflow-hidden bg-zinc-100 flex-shrink-0">
+                              <img src={item.image} alt={translatedName} className="w-full h-full object-cover" />
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-sm font-bold dark:text-white line-clamp-1">{translatedName}</p>
+                              <p className="text-xs text-zinc-500">{item.quantity} x {formatPrice(item.price)}</p>
+                            </div>
+                            <p className="text-sm font-bold dark:text-white">{formatPrice(item.quantity * item.price)}</p>
                           </div>
-                          <div className="flex-1">
-                            <p className="text-sm font-bold dark:text-white line-clamp-1">{item.name}</p>
-                            <p className="text-xs text-zinc-500">{item.quantity} x {formatPrice(item.price)}</p>
-                          </div>
-                          <p className="text-sm font-bold dark:text-white">{formatPrice(item.quantity * item.price)}</p>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
 
                   <div className="pt-6 border-t dark:border-zinc-800">
-                    <div className="flex justify-between items-center bg-zinc-50 dark:bg-zinc-800 p-4 rounded-xl">
-                      <span className="font-bold dark:text-white">Total à payer</span>
-                      <span className="text-xl font-bold text-brand">{formatPrice(total)}</span>
+                    <div className="bg-zinc-50 dark:bg-zinc-800 p-4 rounded-xl space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="font-bold dark:text-white">{lt.totalToPay}</span>
+                        <span className="text-xl font-bold text-brand">{formatPrice(total)}</span>
+                      </div>
+                      {currency !== 'CDF' && (
+                        <div className="flex justify-between items-center pt-2 border-t border-zinc-250/55 dark:border-zinc-700 text-xs font-semibold text-zinc-500">
+                          <span>{lt.conversionRequired}</span>
+                          <span className="text-sm font-black text-brand">
+                            {`${Math.round(total * (exchangeRates.eurToCdf || 3100)).toLocaleString('fr-FR')} FC`}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -953,7 +1285,7 @@ export const Checkout: React.FC<CheckoutProps> = ({ cart, onBack, onClearCart, o
                 <div className="flex items-center gap-3 p-4 bg-amber-50 dark:bg-amber-950/20 rounded-xl border border-amber-100 dark:border-amber-900/50">
                   <CheckCircle2 className="w-5 h-5 text-amber-600 shrink-0" />
                   <p className="text-xs text-amber-900 dark:text-amber-200">
-                    Veuillez vérifier vos informations avant de passer au paiement sécurisé.
+                    {lt.verifyNotice}
                   </p>
                 </div>
               </motion.div>
@@ -967,7 +1299,7 @@ export const Checkout: React.FC<CheckoutProps> = ({ cart, onBack, onClearCart, o
               >
                 <div className="flex items-center gap-3 mb-2">
                   <div className="w-8 h-8 bg-brand/10 text-brand rounded-full flex items-center justify-center font-bold">3</div>
-                  <h2 className="text-xl font-bold dark:text-white">Paiement Sécurisé</h2>
+                  <h2 className="text-xl font-bold dark:text-white">{lt.paymentSecure}</h2>
                 </div>
 
                 {/* Payment method selector */}
@@ -994,14 +1326,14 @@ export const Checkout: React.FC<CheckoutProps> = ({ cart, onBack, onClearCart, o
                     }`}
                   >
                     <CreditCard className="w-4 h-4" />
-                    Carte Bancaire
+                    {language === 'en' ? 'Credit Card' : language === 'ln' ? 'Kati ya mbongo' : language === 'sw' ? 'Kadi ya benki' : 'Carte Bancaire'}
                   </button>
                 </div>
 
                 {paymentMethod === 'momo' ? (
                   <div className="bg-zinc-50 dark:bg-zinc-900/40 p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 space-y-6">
                     <div>
-                      <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest block mb-3">Opérateur Mobile de confiance</label>
+                      <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest block mb-3">{lt.momoOperatorTitle}</label>
                       <div className="grid grid-cols-3 gap-3">
                         <button
                           type="button"
@@ -1043,7 +1375,7 @@ export const Checkout: React.FC<CheckoutProps> = ({ cart, onBack, onClearCart, o
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest block">Numéro de Téléphone RDC</label>
+                      <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest block">{lt.rdcPhoneNumber}</label>
                       <div className="relative">
                         <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
                         <input 
@@ -1056,14 +1388,14 @@ export const Checkout: React.FC<CheckoutProps> = ({ cart, onBack, onClearCart, o
                         />
                       </div>
                       <p className="text-[10px] text-zinc-400">
-                        Saisissez votre numéro actif lié à votre compte Mobile Money pour la transaction de secours.
+                        {lt.momoPhoneDesc}
                       </p>
                     </div>
 
                     <div className="p-3 bg-brand/5 dark:bg-brand/10 border border-brand/10 rounded-xl flex items-start gap-2.5">
                       <Lock className="w-4 h-4 text-brand shrink-0 mt-0.5" />
                       <p className="text-[10px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                        <strong>Protection USSD Eladma Security</strong> : Une simulation interactive sécurisée d'accord Pin USSD de virement s'affichera au déclenchement. Aucune carte bancaire requise.
+                        <strong>{lt.momoProtectionTitle}</strong> : {lt.momoProtectionDesc}
                       </p>
                     </div>
                   </div>
@@ -1071,11 +1403,11 @@ export const Checkout: React.FC<CheckoutProps> = ({ cart, onBack, onClearCart, o
                   <div className="bg-zinc-50 dark:bg-zinc-900/40 p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 space-y-4">
                     <div className="flex items-center gap-2 text-brand mb-2">
                       <CreditCard className="w-5 h-5" />
-                      <span className="font-bold text-sm">Paiement par Carte de Crédit</span>
+                      <span className="font-bold text-sm">{lt.creditCardTitle}</span>
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-zinc-500 uppercase">Numéro de Carte</label>
+                      <label className="text-xs font-bold text-zinc-500 uppercase">{lt.cardNumber}</label>
                       <input 
                         type="text" placeholder="0000 0000 0000 0000" required={paymentMethod === 'card'} name="cardNumber"
                         className="w-full bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-brand/20 dark:text-white placeholder:text-zinc-400"
@@ -1084,14 +1416,14 @@ export const Checkout: React.FC<CheckoutProps> = ({ cart, onBack, onClearCart, o
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
-                        <label className="text-xs font-bold text-zinc-500 uppercase">Validité</label>
+                        <label className="text-xs font-bold text-zinc-500 uppercase">{lt.validity}</label>
                         <input 
                           type="text" placeholder="MM/YY" required={paymentMethod === 'card'} name="cardExpiry"
                           className="w-full bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-brand/20 dark:text-white placeholder:text-zinc-400"
                         />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-xs font-bold text-zinc-500 uppercase">CVV</label>
+                        <label className="text-xs font-bold text-zinc-500 uppercase">{lt.cvv}</label>
                         <input 
                           type="text" placeholder="000" required={paymentMethod === 'card'} name="cardCvc"
                           className="w-full bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-brand/20 dark:text-white placeholder:text-zinc-400"
@@ -1101,9 +1433,24 @@ export const Checkout: React.FC<CheckoutProps> = ({ cart, onBack, onClearCart, o
                   </div>
                 )}
 
+                {getGoogleAccessToken() && (
+                  <label className="flex items-center gap-3 p-3.5 bg-orange-50 dark:bg-orange-950/20 border border-orange-100 dark:border-orange-900/30 rounded-xl cursor-pointer select-none">
+                    <input 
+                      type="checkbox" 
+                      checked={notifyChat} 
+                      onChange={(e) => setNotifyChat(e.target.checked)}
+                      className="rounded border-zinc-300 text-orange-600 focus:ring-orange-500 w-4 h-4 bg-white dark:bg-zinc-950" 
+                    />
+                    <div className="text-left">
+                      <p className="text-xs font-bold text-orange-800 dark:text-orange-400">🔔 Notifier via Google Chat</p>
+                      <p className="text-[10px] text-zinc-500 mt-0.5">Le résumé complet de votre commande sera automatiquement envoyé sur votre salon de discussion actif.</p>
+                    </div>
+                  </label>
+                )}
+
                 <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20 p-3 rounded-xl border border-emerald-100 dark:border-emerald-900/50">
                   <ShieldCheck className="w-5 h-5" />
-                  <span className="text-xs font-medium">Vos informations sont chiffrées et sécurisées par Eladma Pay.</span>
+                  <span className="text-xs font-medium">{lt.encryptionNotice}</span>
                 </div>
               </motion.div>
             )}
@@ -1115,14 +1462,14 @@ export const Checkout: React.FC<CheckoutProps> = ({ cart, onBack, onClearCart, o
                   onClick={() => setStep(step - 1)}
                   className="flex-1 py-4 border-2 border-zinc-100 dark:border-zinc-800 dark:text-white rounded-2xl font-bold hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-all text-sm"
                 >
-                  Précédent
+                  {lt.previous}
                 </button>
               )}
               <button 
                 type="submit"
                 className="flex-[2] py-4 bg-brand text-white rounded-2xl font-bold hover:bg-brand-dark transition-all shadow-lg shadow-brand/20 text-sm"
               >
-                {step === 1 ? 'Continuer vers le récapitulatif' : step === 2 ? 'Confirmer et payer' : `Finaliser le paiement de ${formatPrice(total)}`}
+                {step === 1 ? lt.continueSummary : step === 2 ? lt.confirmPay : `${lt.finalizePayment} ${currency === 'CDF' ? formatPrice(total) : `${Math.round(total * (exchangeRates.eurToCdf || 3100)).toLocaleString('fr-FR')} FC`}`}
               </button>
             </div>
           </form>
@@ -1160,6 +1507,17 @@ export const Checkout: React.FC<CheckoutProps> = ({ cart, onBack, onClearCart, o
                 <span>Total</span>
                 <span className="text-brand">{formatPrice(total)}</span>
               </div>
+              {currency !== 'CDF' && (
+                <div className="mt-3 p-3 bg-brand/5 border border-brand/20 rounded-xl space-y-1">
+                  <div className="flex justify-between text-xs font-bold text-brand">
+                    <span>Paiement requis en CDF</span>
+                    <span>{`${Math.round(total * (exchangeRates.eurToCdf || 3100)).toLocaleString('fr-FR')} FC`}</span>
+                  </div>
+                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400 font-semibold leading-relaxed">
+                    * La monnaie de paiement acceptée sur Eladma est le Franc Congolais (CDF). Votre montant est converti automatiquement.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1179,7 +1537,7 @@ export const Checkout: React.FC<CheckoutProps> = ({ cart, onBack, onClearCart, o
             <div className="flex items-center justify-between mb-4 pb-2 border-b border-zinc-800 text-xs text-zinc-400">
               <div className="flex items-center gap-1.5 font-bold uppercase tracking-wider text-green-500">
                 <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-ping" />
-                <span>Service USSD Actif</span>
+                <span>{lt.ussdActiveService}</span>
               </div>
               <span className="font-semibold">Dial: *111# / *150#</span>
             </div>
@@ -1188,15 +1546,20 @@ export const Checkout: React.FC<CheckoutProps> = ({ cart, onBack, onClearCart, o
               <div className="w-12 h-12 bg-green-500/10 text-green-400 rounded-full flex items-center justify-center mx-auto mb-1 border border-green-500/20">
                 <Lock className="w-6 h-6 animate-pulse" />
               </div>
-              <h3 className="text-sm font-black text-white uppercase tracking-wider">Paiement Mobile RDC</h3>
+              <h3 className="text-sm font-black text-white uppercase tracking-wider">{lt.ussdPinTitle}</h3>
               <p className="text-xs text-zinc-300 leading-relaxed max-w-[250px] mx-auto">
-                Confirmez le transfert de <strong className="text-brand font-black">{formatPrice(total)}</strong> à <span className="text-green-400">ELADMA SARL</span> via <span className="uppercase text-white font-bold">{momoOperator}</span> :
+                {lt.ussdPinConfirmDesc} <strong className="text-brand font-black">{`${Math.round(total * (exchangeRates.eurToCdf || 3100)).toLocaleString('fr-FR')} FC`}</strong> à <span className="text-green-400 font-bold">ELADMA SARL</span> via <span className="uppercase text-white font-bold">{momoOperator}</span> :
               </p>
+              {currency !== 'CDF' && (
+                <p className="text-[10px] text-zinc-400 max-w-[250px] mx-auto opacity-80 italic mt-1 leading-normal">
+                  {lt.ussdPinConvertDesc.replace('{amount}', formatPrice(total))}
+                </p>
+              )}
             </div>
 
             {/* Simulated PIN input screen indicator */}
             <div className="my-6 bg-black/50 border border-zinc-800 rounded-xl p-4 text-center">
-              <span className="text-xs text-zinc-500 block mb-2 uppercase tracking-widest font-black">Saisissez votre PIN</span>
+              <span className="text-xs text-zinc-500 block mb-2 uppercase tracking-widest font-black">{lt.ussdPinInputText}</span>
               <div className="flex justify-center gap-3.5 my-1.5 h-6">
                 {[0, 1, 2, 3].map((idx) => {
                   const hasDigit = ussdPin.length > idx;
@@ -1268,7 +1631,7 @@ export const Checkout: React.FC<CheckoutProps> = ({ cart, onBack, onClearCart, o
                 }}
                 className="py-3 bg-zinc-800/40 hover:bg-zinc-700/40 text-amber-500 text-xs font-black rounded-xl border border-zinc-700/10 transition-all uppercase flex items-center justify-center whitespace-nowrap"
               >
-                Effacer
+                {language === 'en' ? 'Clear' : language === 'ln' ? 'Popolo' : language === 'sw' ? 'Futa' : 'Effacer'}
               </button>
             </div>
 
@@ -1284,7 +1647,7 @@ export const Checkout: React.FC<CheckoutProps> = ({ cart, onBack, onClearCart, o
                 }}
                 className="py-3 bg-transparent border border-zinc-700 text-zinc-400 hover:text-white rounded-xl font-bold text-xs transition-colors"
               >
-                ANNULER
+                {language === 'en' ? 'CANCEL' : language === 'ln' ? 'KOBOMA' : language === 'sw' ? 'GHAHIRI' : 'ANNULER'}
               </button>
               <button
                 type="button"
@@ -1299,7 +1662,7 @@ export const Checkout: React.FC<CheckoutProps> = ({ cart, onBack, onClearCart, o
                 className="py-3 bg-green-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-green-500 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-green-600/10 flex items-center justify-center gap-1.5"
               >
                 <Send className="w-3.5 h-3.5" />
-                ENVOYER PIN
+                {language === 'en' ? 'SEND PIN' : language === 'ln' ? 'TINDA PIN' : language === 'sw' ? 'TUMA PIN' : 'ENVOYER PIN'}
               </button>
             </div>
           </motion.div>

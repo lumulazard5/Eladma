@@ -1,0 +1,72 @@
+# Eladma Sovereign Anti-Scrape Rules
+# Prevent AI Crawlers, scrapers and automated prompt generators from replication
+
+User-agent: GPTBot
+Disallow: /
+
+User-agent: ChatGPT-User
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: Claude-Web
+Disallow: /
+
+User-agent: Anthropic-ai
+Disallow: /
+
+User-agent: PerplexityBot
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+User-agent: cohere-ai
+Disallow: /
+
+User-agent: Omgilibot
+Disallow: /
+
+User-agent: Applebot-Extended
+Disallow: /
+
+User-agent: FacebookBot
+Disallow: /
+
+User-agent: Diffbot
+Disallow: /
+
+User-agent: BYNDyBot
+Disallow: /
+
+User-agent: AWS-Crawler
+Disallow: /
+
+# Standard web-scrapers and cloner bots
+User-agent: HTTrack
+Disallow: /
+
+User-agent: Wget
+Disallow: /
+
+User-agent: curl
+Disallow: /
+
+User-agent: Pycurl
+Disallow: /
+
+User-agent: ScrapingBot
+Disallow: /
+
+User-agent: WebCopier
+Disallow: /
+
+# Disallow standard access to deep internal routes
+User-agent: *
+Disallow: /api/
+Disallow: /supplier/
+Disallow: /checkout/

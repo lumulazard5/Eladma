@@ -70,6 +70,7 @@ export interface SupplierProduct {
   threshold: number;
   status: 'active' | 'inactive';
   image: string;
+  description?: string;
 }
 
 interface SupplierDashboardProps {
@@ -144,7 +145,116 @@ export const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ onBack }) 
     const saved = localStorage.getItem('eladma-supplier-status');
     return (saved as VerificationStatus) || 'unregistered';
   });
-  const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'orders' | 'api' | 'payout'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'orders' | 'api' | 'payout' | 'site_config' | 'admin_accounts' | 'partner_audit'>('overview');
+
+  // Partner structured full business address fields (N°, Avenue, Quartier, Commune, Ville, Province)
+  const [addressStreet, setAddressStreet] = useState(() => localStorage.getItem('eladma-supplier-street') || '');
+  const [addressNumber, setAddressNumber] = useState(() => localStorage.getItem('eladma-supplier-number') || '');
+  const [addressNeighborhood, setAddressNeighborhood] = useState(() => localStorage.getItem('eladma-supplier-neighborhood') || '');
+  const [addressCommune, setAddressCommune] = useState(() => localStorage.getItem('eladma-supplier-commune') || '');
+  const [addressCity, setAddressCity] = useState(() => localStorage.getItem('eladma-supplier-city') || 'Kananga');
+  const [addressProvince, setAddressProvince] = useState(() => localStorage.getItem('eladma-supplier-province') || 'Kasaï-Central');
+
+  // Site Configuration & Customizations State
+  const [siteName, setSiteName] = useState(() => localStorage.getItem('eladma-site-name') || 'Eladma RDC');
+  const [siteAnnouncement, setSiteAnnouncement] = useState(() => localStorage.getItem('eladma-site-announcement') || '🚀 Bienvenue sur la première marketplace inclusive de la RDC ! Services financiers MPesa & Rawbank intégrés.');
+  const [siteContactEmail, setSiteContactEmail] = useState(() => localStorage.getItem('eladma-site-contact-email') || 'support@eladma.com');
+  const [siteContactPhone, setSiteContactPhone] = useState(() => localStorage.getItem('eladma-site-contact-phone') || '+243 821 234 567');
+
+  // Interactive Policy Overrides State
+  const [policyShipping, setPolicyShipping] = useState(() => localStorage.getItem('eladma-policy-override-shipping') || '');
+  const [policyRefund, setPolicyRefund] = useState(() => localStorage.getItem('eladma-policy-override-refund') || '');
+  const [policyTerms, setPolicyTerms] = useState(() => localStorage.getItem('eladma-policy-override-terms') || '');
+  const [policyPrivacy, setPolicyPrivacy] = useState(() => localStorage.getItem('eladma-policy-override-privacy') || '');
+  const [policyMission, setPolicyMission] = useState(() => localStorage.getItem('eladma-policy-override-mission') || '');
+
+  // Admin accounts list state
+  const [adminAccounts, setAdminAccounts] = useState<{ id: string; name: string; email: string; role: string; status: 'active' | 'inactive'; joined: string }[]>(() => {
+    try {
+      const saved = localStorage.getItem('eladma-admin-accounts-list');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return [
+      { id: 'admin-1', name: 'Lazard Lumu', email: 'lumulazard5@gmail.com', role: 'Super-Administrateur Général (Directeur RDC)', status: 'active', joined: '12/03/2026' },
+      { id: 'admin-2', name: 'Dr. Martin Mukendi', email: 'm.mukendi@eladma.com', role: 'Chef de la Conformité Juridique', status: 'active', joined: '28/04/2026' },
+      { id: 'admin-3', name: 'Sifa Kalala', email: 's.kalala@eladma.org', role: 'Modératrice Provinciale (Kananga)', status: 'active', joined: '10/05/2026' },
+      { id: 'admin-4', name: 'Audit Robot IA', email: 'ai.auditor@eladma.com', role: 'Auditeur de Documents par Vision IA', status: 'active', joined: '20/05/2026' },
+    ];
+  });
+
+  const [newAdminName, setNewAdminName] = useState('');
+  const [newAdminEmail, setNewAdminEmail] = useState('');
+  const [newAdminRole, setNewAdminRole] = useState('Inspecteur de Conformité');
+
+  // Database of other applicants (for simulation of audit queues)
+  const [partnerApplicants, setPartnerApplicants] = useState<{
+    id: string;
+    company: string;
+    city: string;
+    province: string;
+    address: string;
+    status: 'pending' | 'verified' | 'rejected';
+    selfie: string;
+    documents: { id: string; name: string; size: string; title: string; check: boolean }[];
+    signature: boolean;
+  }[]>(() => {
+    try {
+      const saved = localStorage.getItem('eladma-pending-applicants-list');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return [
+      { 
+        id: 'part-1', 
+        company: 'Artisans du Bois de Kananga', 
+        city: 'Kananga', 
+        province: 'Kasaï-Central', 
+        address: 'N° 89, Av. du Commerce, Quartier Tshinsambi, Commune de Kananga',
+        status: 'pending',
+        selfie: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=60',
+        documents: [
+          { id: 'id', name: 'ID_Gerant_Kabasele_Hubert.pdf', size: '1.4 MB', title: "Pièce d'identité du gérant", check: true },
+          { id: 'reg', name: 'RCCM_Artisan_Kananga_CD.pdf', size: '2.1 MB', title: "Registre de Commerce (RCCM)", check: false },
+          { id: 'tax', name: 'Fiscalite_Zero_Tshinsambi.pdf', size: '920 KB', title: "Attestation Fiscale", check: true },
+        ],
+        signature: true
+      },
+      { 
+        id: 'part-2', 
+        company: 'Femmes Unies pour le Tissage de Mwene-Ditu', 
+        city: 'Mwene-Ditu', 
+        province: 'Lomami', 
+        address: 'N° 401, Route Nationale 1, Quartier Mwene-Ditu Central',
+        status: 'verified',
+        selfie: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=60',
+        documents: [
+          { id: 'id', name: 'CNI_Mukaji_Marie.pdf', size: '1.1 MB', title: "Pièce d'identité", check: true },
+          { id: 'reg', name: 'RCCM_Tissage_MweneDitu_CD.pdf', size: '3.3 MB', title: "Registre de Commerce", check: true },
+          { id: 'tax', name: 'Declaration_DGI_Exonere.pdf', size: '750 KB', title: "Attestation Fiscale", check: true },
+        ],
+        signature: true
+      },
+      { 
+        id: 'part-3', 
+        company: 'Coopérative Minière d\'Art de Kolwezi', 
+        city: 'Kolwezi', 
+        province: 'Lualaba', 
+        address: 'N° 12, Chaussée de Kolwezi, Quartier Mutoshi',
+        status: 'rejected',
+        selfie: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=60',
+        documents: [
+          { id: 'id', name: 'Kolwezi_Gerant_Inconnu.pdf', size: '2.5 MB', title: "Pièce d'identité", check: false },
+          { id: 'reg', name: 'RCCM_Kolwezi_Faux_Fichier.pdf', size: '4.2 MB', title: "Registre de Commerce", check: false },
+          { id: 'tax', name: 'DGI_Regularites_Fisc_Missing.pdf', size: '1.6 MB', title: "Attestation Fiscale", check: false },
+        ],
+        signature: false
+      }
+    ];
+  });
+
+  const [auditedApplicantId, setAuditedApplicantId] = useState<string>('part-1');
+  const selectedApplicant = useMemo(() => {
+    return partnerApplicants.find(p => p.id === auditedApplicantId) || partnerApplicants[0];
+  }, [partnerApplicants, auditedApplicantId]);
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [supplierProducts, setSupplierProducts] = useState<SupplierProduct[]>(() => {
     const saved = localStorage.getItem('eladma-supplier-products');
@@ -163,10 +273,50 @@ export const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ onBack }) 
     ];
   });
   const [editingProduct, setEditingProduct] = useState<SupplierProduct | null>(null);
+  const [addProductImage, setAddProductImage] = useState<string>('');
+  const [editProductImage, setEditProductImage] = useState<string>('');
+
+  useEffect(() => {
+    if (editingProduct) {
+      setEditProductImage(editingProduct.image || '');
+    } else {
+      setEditProductImage('');
+    }
+  }, [editingProduct]);
+
+  const handleProductFileChange = (e: React.ChangeEvent<HTMLInputElement>, isEdit: boolean) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        toast.error("⚠️ Image trop volumineuse : Veuillez choisir une image inférieure à 2 Mo.");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64 = reader.result as string;
+        if (isEdit) {
+          setEditProductImage(base64);
+        } else {
+          setAddProductImage(base64);
+        }
+        toast.success("Image chargée avec succès !");
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const [lowStockFilter, setLowStockFilter] = useState(false);
   const [searchProductQuery, setSearchProductQuery] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
   const [orders, setOrders] = useState<Order[]>(orderManager.getOrders());
+
+  useEffect(() => {
+    // Sync with orderManager real-time cloud updates
+    const unsubscribe = orderManager.subscribe((updatedOrders) => {
+      setOrders(updatedOrders);
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Real-time new order simulator with detailed toasts
   const simulateNewOrder = React.useCallback(() => {
@@ -280,14 +430,31 @@ export const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ onBack }) 
   const [signature, setSignature] = useState<string | null>(() => localStorage.getItem('eladma-supplier-signature'));
   const [companyName, setCompanyName] = useState(() => localStorage.getItem('eladma-supplier-company') || '');
   const [location, setLocation] = useState(() => localStorage.getItem('eladma-supplier-location') || '');
+
+  // Keep location in sync with structured address components
+  useEffect(() => {
+    if (addressStreet && addressCity) {
+      const fullAddressCombined = [
+        addressNumber ? `N° ${addressNumber}` : '',
+        addressStreet ? `Av/Rue ${addressStreet}` : '',
+        addressNeighborhood ? `Q. ${addressNeighborhood}` : '',
+        addressCommune ? `Comm. ${addressCommune}` : '',
+        addressCity,
+        addressProvince
+      ].filter(Boolean).join(', ');
+      setLocation(fullAddressCombined);
+      localStorage.setItem('eladma-supplier-location', fullAddressCombined);
+    }
+  }, [addressNumber, addressStreet, addressNeighborhood, addressCommune, addressCity, addressProvince]);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showKYC, setShowKYC] = useState(false);
   const [selfie, setSelfie] = useState<string | null>(() => localStorage.getItem('eladma-supplier-selfie'));
   const [rejectionReason, setRejectionReason] = useState<string | null>(() => localStorage.getItem('eladma-supplier-rejection-reason'));
 
   // payout details configuration
-  const [payoutMethod, setPayoutMethod] = useState<'momo' | 'bank'>(() => {
-    return (localStorage.getItem('eladma-payout-method') as 'momo' | 'bank') || 'momo';
+  const [payoutMethod, setPayoutMethod] = useState<'momo' | 'bank' | 'maxicash'>(() => {
+    return (localStorage.getItem('eladma-payout-method') as 'momo' | 'bank' | 'maxicash') || 'momo';
   });
   const [momoProvider, setMomoProvider] = useState<string>(() => {
     return localStorage.getItem('eladma-payout-momo-provider') || 'M-Pesa';
@@ -311,13 +478,31 @@ export const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ onBack }) 
     return localStorage.getItem('eladma-payout-bank-holder') || '';
   });
 
+  const [maxicashEmail, setMaxicashEmail] = useState<string>(() => {
+    return localStorage.getItem('eladma-payout-maxicash-email') || '';
+  });
+  const [maxicashPhone, setMaxicashPhone] = useState<string>(() => {
+    return localStorage.getItem('eladma-payout-maxicash-phone') || '';
+  });
+  const [maxicashHolder, setMaxicashHolder] = useState<string>(() => {
+    return localStorage.getItem('eladma-payout-maxicash-holder') || '';
+  });
+  const [maxicashPin, setMaxicashPin] = useState<string>(() => {
+    return localStorage.getItem('eladma-payout-maxicash-pin') || '';
+  });
+  const [maxicashPayoutTarget, setMaxicashPayoutTarget] = useState<'momo' | 'bank'>(() => {
+    return (localStorage.getItem('eladma-payout-maxicash-target') as 'momo' | 'bank') || 'momo';
+  });
+
   const isPayoutConfigured = useMemo(() => {
     if (payoutMethod === 'momo') {
       return !!momoPhone && momoPhone.trim().length > 3 && !!momoHolder && momoHolder.trim().length > 2;
-    } else {
+    } else if (payoutMethod === 'bank') {
       return !!bankAccount && bankAccount.trim().length > 5 && !!bankHolder && bankHolder.trim().length > 2;
+    } else {
+      return !!maxicashEmail && maxicashEmail.includes('@') && !!maxicashHolder && maxicashHolder.trim().length > 2;
     }
-  }, [payoutMethod, momoPhone, momoHolder, bankAccount, bankHolder]);
+  }, [payoutMethod, momoPhone, momoHolder, bankAccount, bankHolder, maxicashEmail, maxicashHolder]);
 
   const handleSavePayoutDetails = (e: React.FormEvent) => {
     e.preventDefault();
@@ -332,6 +517,11 @@ export const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ onBack }) 
     const cleanBankSwift = EladmaSecurity.sanitizeInput(bankSwift);
     const cleanBankHolder = EladmaSecurity.sanitizeInput(bankHolder);
 
+    const cleanMaxicashEmail = EladmaSecurity.sanitizeInput(maxicashEmail);
+    const cleanMaxicashPhone = EladmaSecurity.sanitizeInput(maxicashPhone);
+    const cleanMaxicashHolder = EladmaSecurity.sanitizeInput(maxicashHolder);
+    const cleanMaxicashPin = EladmaSecurity.sanitizeInput(maxicashPin);
+
     localStorage.setItem('eladma-payout-method', payoutMethod);
     localStorage.setItem('eladma-payout-momo-provider', momoProvider);
     localStorage.setItem('eladma-payout-momo-phone', cleanMomoPhone || '');
@@ -341,10 +531,18 @@ export const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ onBack }) 
     localStorage.setItem('eladma-payout-bank-swift', cleanBankSwift || '');
     localStorage.setItem('eladma-payout-bank-holder', cleanBankHolder || '');
 
+    localStorage.setItem('eladma-payout-maxicash-email', cleanMaxicashEmail || '');
+    localStorage.setItem('eladma-payout-maxicash-phone', cleanMaxicashPhone || '');
+    localStorage.setItem('eladma-payout-maxicash-holder', cleanMaxicashHolder || '');
+    localStorage.setItem('eladma-payout-maxicash-pin', cleanMaxicashPin || '');
+    localStorage.setItem('eladma-payout-maxicash-target', maxicashPayoutTarget);
+
     sounds.success();
     haptics.success();
     toast.success("🏦 Coordonnées financières mises à jour avec succès !", {
-      description: "Vos futurs versements de ventes seront envoyés à ces coordonnées."
+      description: payoutMethod === 'maxicash' 
+        ? `Liaison effectuée avec les serveurs MaxiCash. Flux configuré vers votre option : ${maxicashPayoutTarget === 'momo' ? 'Mobile Money (M-Pesa/Orange/Airtel)' : 'Compte Bancaire (EquityBCDC/Rawbank)'}`
+        : "Vos futurs versements de ventes seront envoyés à ces coordonnées."
     });
   };
 
@@ -454,7 +652,7 @@ export const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ onBack }) 
     }
   };
 
-  const handleAddSupplierProduct = (name: string, price: number, stock: number, threshold: number, category: string, desc: string) => {
+  const handleAddSupplierProduct = (name: string, price: number, stock: number, threshold: number, category: string, desc: string, image?: string) => {
     const newProd: SupplierProduct = {
       id: Date.now().toString(),
       name,
@@ -463,7 +661,8 @@ export const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ onBack }) 
       stock,
       threshold,
       status: 'active',
-      image: `https://picsum.photos/seed/p${Math.floor(Math.random() * 100)}/100/100`
+      image: image || `https://picsum.photos/seed/p${Math.floor(Math.random() * 100)}/100/100`,
+      description: desc
     };
     const updated = [newProd, ...supplierProducts];
     saveSupplierProducts(updated);
@@ -474,6 +673,23 @@ export const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ onBack }) 
   const saveSupplierProducts = (newProducts: SupplierProduct[]) => {
     setSupplierProducts(newProducts);
     localStorage.setItem('eladma-supplier-products', JSON.stringify(newProducts));
+  };
+
+  const handleUpdateSupplierProduct = (id: string, name: string, price: number, stock: number, threshold: number, category: string, desc: string, image?: string) => {
+    const updated = supplierProducts.map(p => p.id === id ? { 
+      ...p, 
+      name, 
+      price, 
+      stock, 
+      threshold, 
+      category, 
+      description: desc,
+      image: image || p.image 
+    } : p);
+    saveSupplierProducts(updated);
+    haptics.success();
+    sounds.success();
+    toast.success("Produit mis à jour avec succès !");
   };
 
   const handleUpdateProductStockAndThreshold = (id: string, stock: number, threshold: number) => {
@@ -639,11 +855,11 @@ export const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ onBack }) 
               )}
 
               <form onSubmit={handleRegister} className="space-y-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 gap-6">
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2">
                       <Building2 className="w-3 h-3" />
-                      Nom de l'entreprise
+                      Nom officiel de l'entreprise d'artisanat / commerce
                     </label>
                     <input 
                       required 
@@ -654,19 +870,103 @@ export const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ onBack }) 
                       placeholder="ex: Coopérative de Ngaza" 
                     />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2">
-                      <MapPin className="w-3 h-3" />
-                      Siège Social
-                    </label>
-                    <input 
-                      required 
-                      type="text" 
-                      value={location}
-                      onChange={(e) => setLocation(e.target.value)}
-                      className="w-full bg-zinc-50 dark:bg-zinc-800 border-none rounded-xl p-4 outline-none focus:ring-2 focus:ring-brand dark:text-white" 
-                      placeholder="Kananga, RDC" 
-                    />
+
+                  {/* Complete Structured Physical Business Address */}
+                  <div className="bg-zinc-50/50 dark:bg-zinc-900/30 p-6 rounded-2xl border border-zinc-200/50 dark:border-zinc-800 space-y-4">
+                    <h4 className="text-xs font-black text-brand uppercase tracking-widest flex items-center gap-2">
+                      <MapPin className="w-4 h-4" />
+                      Adresse complète du commerce (Requis par les Autorités d'Audit RDC)
+                    </h4>
+                    
+                    <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+                      <div className="col-span-1 md:col-span-1 space-y-2">
+                        <label className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">N°</label>
+                        <input 
+                          type="text" 
+                          value={addressNumber} 
+                          onChange={(e) => {
+                            setAddressNumber(e.target.value);
+                            localStorage.setItem('eladma-supplier-number', e.target.value);
+                          }}
+                          className="w-full bg-white dark:bg-zinc-800 border dark:border-zinc-700/60 rounded-xl p-3 text-xs outline-none focus:ring-2 focus:ring-brand dark:text-white font-mono" 
+                          placeholder="ex: 45" 
+                          required
+                        />
+                      </div>
+                      <div className="col-span-1 md:col-span-2 space-y-2">
+                        <label className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">Avenue / Rue</label>
+                        <input 
+                          type="text" 
+                          value={addressStreet} 
+                          onChange={(e) => {
+                            setAddressStreet(e.target.value);
+                            localStorage.setItem('eladma-supplier-street', e.target.value);
+                          }}
+                          className="w-full bg-white dark:bg-zinc-800 border dark:border-zinc-700/60 rounded-xl p-3 text-xs outline-none focus:ring-2 focus:ring-brand dark:text-white" 
+                          placeholder="Tshinsele" 
+                          required
+                        />
+                      </div>
+                      <div className="col-span-1 md:col-span-3 space-y-2">
+                        <label className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">Quartier</label>
+                        <input 
+                          type="text" 
+                          value={addressNeighborhood} 
+                          onChange={(e) => {
+                            setAddressNeighborhood(e.target.value);
+                            localStorage.setItem('eladma-supplier-neighborhood', e.target.value);
+                          }}
+                          className="w-full bg-white dark:bg-zinc-800 border dark:border-zinc-700/60 rounded-xl p-3 text-xs outline-none focus:ring-2 focus:ring-brand dark:text-white" 
+                          placeholder="Salongo" 
+                          required
+                        />
+                      </div>
+                      <div className="col-span-1 md:col-span-2 space-y-2">
+                        <label className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">Commune</label>
+                        <input 
+                          type="text" 
+                          value={addressCommune} 
+                          onChange={(e) => {
+                            setAddressCommune(e.target.value);
+                            localStorage.setItem('eladma-supplier-commune', e.target.value);
+                          }}
+                          className="w-full bg-white dark:bg-zinc-800 border dark:border-zinc-700/60 rounded-xl p-3 text-xs outline-none focus:ring-2 focus:ring-brand dark:text-white" 
+                          placeholder="Luiza" 
+                          required
+                        />
+                      </div>
+                      <div className="col-span-1 md:col-span-2 space-y-2">
+                        <label className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">Ville / Territoire</label>
+                        <input 
+                          type="text" 
+                          value={addressCity} 
+                          onChange={(e) => {
+                            setAddressCity(e.target.value);
+                            localStorage.setItem('eladma-supplier-city', e.target.value);
+                          }}
+                          className="w-full bg-white dark:bg-zinc-800 border dark:border-zinc-700/60 rounded-xl p-3 text-xs outline-none focus:ring-2 focus:ring-brand dark:text-white" 
+                          placeholder="Luiza" 
+                          required
+                        />
+                      </div>
+                      <div className="col-span-1 md:col-span-2 space-y-2">
+                        <label className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">Province</label>
+                        <input 
+                          type="text" 
+                          value={addressProvince} 
+                          onChange={(e) => {
+                            setAddressProvince(e.target.value);
+                            localStorage.setItem('eladma-supplier-province', e.target.value);
+                          }}
+                          className="w-full bg-white dark:bg-zinc-800 border dark:border-zinc-700/60 rounded-xl p-3 text-xs outline-none focus:ring-2 focus:ring-brand dark:text-white" 
+                          placeholder="Kasaï-Central" 
+                          required
+                        />
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-zinc-550 dark:text-zinc-450 italic mt-2">
+                      📍 Adresse combinée générée pour votre contrat officiel : <span className="text-zinc-800 dark:text-zinc-200 font-bold">{location || '(Saisie en cours)'}</span>
+                    </p>
                   </div>
                 </div>
 
@@ -799,361 +1099,163 @@ export const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ onBack }) 
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-              {/* Le Portail Marchand (Pour le vendeur) */}
-              <div className="lg:col-span-7 space-y-6">
-                <div className="bg-white dark:bg-zinc-900 rounded-[2.5rem] border dark:border-zinc-800 p-8 shadow-xl">
-                  <div className="flex items-center justify-between mb-8 border-b dark:border-zinc-800 pb-6">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-amber-500/10 text-amber-500 rounded-xl flex items-center justify-center">
-                        <Clock className="w-5 h-5 animate-pulse" />
+            <div className="max-w-3xl mx-auto space-y-6">
+              <div className="bg-white dark:bg-zinc-900 rounded-[2.5rem] border dark:border-zinc-800 p-8 shadow-xl">
+                <div className="flex items-center justify-between mb-8 border-b dark:border-zinc-800 pb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-amber-500/10 text-amber-500 rounded-xl flex items-center justify-center">
+                      <Clock className="w-5 h-5 animate-pulse" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-lg dark:text-white">Votre Espace Candidat</h3>
+                      <p className="text-xs text-zinc-500">Statut actuel du traitement</p>
+                    </div>
+                  </div>
+                  <span className="px-4 py-1.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-full text-xs font-black uppercase tracking-widest animate-pulse">
+                    Examen en cours
+                  </span>
+                </div>
+
+                {/* Operational Timeline */}
+                <div className="space-y-6 mb-8 relative before:absolute before:left-[1.125rem] before:top-2 before:bottom-2 before:w-[2px] before:bg-zinc-100 dark:before:bg-zinc-800">
+                  {[
+                    { 
+                      title: "Dépôt des pièces d'activité", 
+                      desc: "Les documents RCCM, d'identité du gérant et certifications fiscales ont été chiffrés et transmis.", 
+                      status: "complete", 
+                      time: "Aujourd'hui" 
+                    },
+                    { 
+                      title: "Signature contractuelle effectuée", 
+                      desc: "Le contrat de distribution v1.4 a été validé et signé électroniquement par l'entreprise.", 
+                      status: "complete", 
+                      time: "Aujourd'hui" 
+                    },
+                    { 
+                      title: "Vérification d'identité IA", 
+                      desc: "Le selfie d'identification biométrique a été comparé avec la CNI avec succès (Match 98%).", 
+                      status: "complete", 
+                      time: "Aujourd'hui" 
+                    },
+                    { 
+                      title: "Audit Human-in-the-Loop Administrateur", 
+                      desc: "Un modérateur Eladma authentifié à Kananga/C vérifie la validité légale des pièces fournies.", 
+                      status: "pending", 
+                      time: "En attente" 
+                    }
+                  ].map((step, idx) => (
+                    <div key={idx} className="flex gap-4 relative">
+                      <div className={`w-9 h-9 rounded-full shrink-0 flex items-center justify-center font-bold text-xs ring-4 ring-white dark:ring-zinc-900 ${
+                        step.status === 'complete' 
+                          ? 'bg-emerald-500 text-white' 
+                          : 'bg-amber-500/20 text-amber-500 animate-pulse'
+                      }`}>
+                        {step.status === 'complete' ? (
+                          <Check className="w-4 h-4" />
+                        ) : (
+                          <Clock className="w-4 h-4" />
+                        )}
                       </div>
-                      <div>
-                        <h3 className="font-bold text-lg dark:text-white">Votre Espace Candidat</h3>
-                        <p className="text-xs text-zinc-500">Statut actuel du traitement</p>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <h4 className="font-bold text-sm dark:text-white">{step.title}</h4>
+                          <span className="text-[10px] text-zinc-400 whitespace-nowrap">{step.time}</span>
+                        </div>
+                        <p className="text-xs text-zinc-500 mt-1 leading-relaxed">{step.desc}</p>
                       </div>
                     </div>
-                    <span className="px-4 py-1.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-full text-xs font-black uppercase tracking-widest animate-pulse">
-                      Examen en cours
-                    </span>
+                  ))}
+                </div>
+
+                {/* Summary of submitted data */}
+                <div className="border-t border-zinc-100 dark:border-zinc-800 pt-6 space-y-4">
+                  <h4 className="text-xs font-black text-zinc-400 uppercase tracking-widest bg-zinc-50 dark:bg-zinc-800/20 p-2 rounded-lg inline-block">Informations du dossier</h4>
+                  <div className="grid grid-cols-2 gap-4 text-xs">
+                    <div className="bg-zinc-50 dark:bg-zinc-800/40 p-4 rounded-xl">
+                      <span className="text-zinc-500 block mb-1">Nom de l'entreprise</span>
+                      <strong className="dark:text-white break-words">{companyName || "Non spécifié"}</strong>
+                    </div>
+                    <div className="bg-zinc-50 dark:bg-zinc-800/40 p-4 rounded-xl">
+                      <span className="text-zinc-500 block mb-1">Siège principal</span>
+                      <strong className="dark:text-white">{location || "Non spécifié"}</strong>
+                    </div>
                   </div>
 
-                  {/* Operational Timeline */}
-                  <div className="space-y-6 mb-8 relative before:absolute before:left-[1.125rem] before:top-2 before:bottom-2 before:w-[2px] before:bg-zinc-100 dark:before:bg-zinc-800">
+                  <div className="space-y-2">
+                    <span className="text-xs text-zinc-500 block">Fichiers transmis pour certification</span>
                     {[
                       { 
-                        title: "Dépôt des pièces d'activité", 
-                        desc: "Les documents RCCM, d'identité du gérant et certifications fiscales ont été chiffrés et transmis.", 
-                        status: "complete", 
-                        time: "Aujourd'hui" 
+                        id: 'id', 
+                        name: 'CNI_Gerant_Officiel.pdf', 
+                        size: '1.2 MB', 
+                        title: "Pièce d'identité du gérant", 
+                        content: `RÉPUBLIQUE DÉMOCRATIQUE DU CONGO\nCARTE D'ÉLECTEUR / D'IDENTITÉ PROVISOIRE\n\nN° National : RDC-903423-H\nNom : TOUT-VENANT\nPrénom : MARCHANT\nNationalité : Congolaise\nLieu de naissance : Kananga\n\n[Statut : Vérifié avec succès par comparaison faciale Eladma AI-Identity (Score de similitude: 98.4%)]` 
                       },
                       { 
-                        title: "Signature contractuelle effectuée", 
-                        desc: "Le contrat de distribution v1.4 a été validé et signé électroniquement par l'entreprise.", 
-                        status: "complete", 
-                        time: "Aujourd'hui" 
+                        id: 'reg', 
+                        name: 'Registre_RCCM_Validation_Eladma.pdf', 
+                        size: '2.4 MB', 
+                        title: "Registre de Commerce (RCCM)", 
+                        content: companyName ? `GREFFE DU TRIBUNAL DE COMMERCE DE KANANGA\nREGISTRE DU COMMERCE ET DU CRÉDIT MOBILIER (RCCM)\n\nNuméro d'immatriculation : CD/KAN/RCCM/26-B-0421\n\nDénomination sociale : ${companyName}\nForme juridique : Société Coopérative\nAdresse du siège : ${location || 'Kananga, RDC'}\nActivité : Commerce général, artisanat régional et distribution numérique.` : `Structure d'enregistrement légale en RDC non confirmée.` 
                       },
                       { 
-                        title: "Vérification d'identité IA", 
-                        desc: "Le selfie d'identification biométrique a été comparé avec la CNI avec succès (Match 98%).", 
-                        status: "complete", 
-                        time: "Aujourd'hui" 
-                      },
-                      { 
-                        title: "Audit Human-in-the-Loop Administrateur", 
-                        desc: "Un modérateur Eladma authentifié à Kananga/C vérifie la validité légale des pièces fournies.", 
-                        status: "pending", 
-                        time: "En attente" 
+                        id: 'tax', 
+                        name: 'Attestation_Fiscale_2026.pdf', 
+                        size: '850 KB', 
+                        title: "Attestation Fiscale", 
+                        content: `DIRECTION GÉNÉRALE DES IMPÔTS (DGI)\nCENTRE DES IMPÔTS SYNTHÉTIQUES DE KANANGA\n\nATTESTATION DE RÉGULARITÉ FISCALE\nN° ARF/DGI/KAN/2026/0291\n\nIl est certifié que le contribuable immatriculé au RCCM sous le numéro CD/KAN/RCCM/26-B-0421 est en règle de ses obligations déclaratives et de paiement pour l'exercice fiscal en cours.` 
                       }
-                    ].map((step, idx) => (
-                      <div key={idx} className="flex gap-4 relative">
-                        <div className={`w-9 h-9 rounded-full shrink-0 flex items-center justify-center font-bold text-xs ring-4 ring-white dark:ring-zinc-900 ${
-                          step.status === 'complete' 
-                            ? 'bg-emerald-500 text-white' 
-                            : 'bg-amber-500/20 text-amber-500 animate-pulse'
-                        }`}>
-                          {step.status === 'complete' ? (
-                            <Check className="w-4 h-4" />
-                          ) : (
-                            <Clock className="w-4 h-4" />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-2">
-                            <h4 className="font-bold text-sm dark:text-white">{step.title}</h4>
-                            <span className="text-[10px] text-zinc-400 whitespace-nowrap">{step.time}</span>
+                    ].map((doc) => (
+                      <div key={doc.id} className="flex items-center justify-between p-3 bg-zinc-50 dark:bg-zinc-800/40 rounded-xl border dark:border-zinc-800">
+                        <div className="flex items-center gap-3">
+                          <FileText className="w-5 h-5 text-brand" />
+                          <div>
+                            <p className="text-xs font-bold dark:text-white">{doc.title}</p>
+                            <p className="text-[10px] text-zinc-400">{doc.name} • {doc.size}</p>
                           </div>
-                          <p className="text-xs text-zinc-500 mt-1 leading-relaxed">{step.desc}</p>
                         </div>
+                        <button 
+                          onClick={() => setInspectingDoc({ title: doc.title, content: doc.content, file: doc.name })}
+                          className="flex items-center gap-1.5 px-3 py-1 bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 border dark:border-zinc-700 rounded-lg text-[10px] font-bold text-zinc-600 dark:text-zinc-300 transition-colors"
+                        >
+                          <Eye className="w-3 h-3" />
+                          Visualiser
+                        </button>
                       </div>
                     ))}
                   </div>
-
-                  {/* Summary of submitted data */}
-                  <div className="border-t border-zinc-100 dark:border-zinc-800 pt-6 space-y-4">
-                    <h4 className="text-xs font-black text-zinc-400 uppercase tracking-widest bg-zinc-50 dark:bg-zinc-800/20 p-2 rounded-lg inline-block">Informations du dossier</h4>
-                    <div className="grid grid-cols-2 gap-4 text-xs">
-                      <div className="bg-zinc-50 dark:bg-zinc-800/40 p-4 rounded-xl">
-                        <span className="text-zinc-500 block mb-1">Nom de l'entreprise</span>
-                        <strong className="dark:text-white break-words">{companyName || "Non spécifié"}</strong>
-                      </div>
-                      <div className="bg-zinc-50 dark:bg-zinc-800/40 p-4 rounded-xl">
-                        <span className="text-zinc-500 block mb-1">Siège principal</span>
-                        <strong className="dark:text-white">{location || "Non spécifié"}</strong>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <span className="text-xs text-zinc-500 block">Fichiers transmis pour certification</span>
-                      {[
-                        { 
-                          id: 'id', 
-                          name: 'CNI_Gerant_Officiel.pdf', 
-                          size: '1.2 MB', 
-                          title: "Pièce d'identité du gérant", 
-                          content: `RÉPUBLIQUE DÉMOCRATIQUE DU CONGO\nCARTE D'ÉLECTEUR / D'IDENTITÉ PROVISOIRE\n\nN° National : RDC-903423-H\nNom : TOUT-VENANT\nPrénom : MARCHANT\nNationalité : Congolaise\nLieu de naissance : Kananga\n\n[Statut : Vérifié avec succès par comparaison faciale Eladma AI-Identity (Score de similitude: 98.4%)]` 
-                        },
-                        { 
-                          id: 'reg', 
-                          name: 'Registre_RCCM_Validation_Eladma.pdf', 
-                          size: '2.4 MB', 
-                          title: "Registre de Commerce (RCCM)", 
-                          content: companyName ? `GREFFE DU TRIBUNAL DE COMMERCE DE KANANGA\nREGISTRE DU COMMERCE ET DU CRÉDIT MOBILIER (RCCM)\n\nNuméro d'immatriculation : CD/KAN/RCCM/26-B-0421\n\nDénomination sociale : ${companyName}\nForme juridique : Société Coopérative\nAdresse du siège : ${location || 'Kananga, RDC'}\nActivité : Commerce général, artisanat régional et distribution numérique.` : `Structure d'enregistrement légale en RDC non confirmée.` 
-                        },
-                        { 
-                          id: 'tax', 
-                          name: 'Attestation_Fiscale_2026.pdf', 
-                          size: '850 KB', 
-                          title: "Attestation Fiscale", 
-                          content: `DIRECTION GÉNÉRALE DES IMPÔTS (DGI)\nCENTRE DES IMPÔTS SYNTHÉTIQUES DE KANANGA\n\nATTESTATION DE RÉGULARITÉ FISCALE\nN° ARF/DGI/KAN/2026/0291\n\nIl est certifié que le contribuable immatriculé au RCCM sous le numéro CD/KAN/RCCM/26-B-0421 est en règle de ses obligations déclaratives et de paiement pour l'exercice fiscal en cours.` 
-                        }
-                      ].map((doc) => (
-                        <div key={doc.id} className="flex items-center justify-between p-3 bg-zinc-50 dark:bg-zinc-800/40 rounded-xl border dark:border-zinc-800">
-                          <div className="flex items-center gap-3">
-                            <FileText className="w-5 h-5 text-brand" />
-                            <div>
-                              <p className="text-xs font-bold dark:text-white">{doc.title}</p>
-                              <p className="text-[10px] text-zinc-400">{doc.name} • {doc.size}</p>
-                            </div>
-                          </div>
-                          <button 
-                            onClick={() => setInspectingDoc({ title: doc.title, content: doc.content, file: doc.name })}
-                            className="flex items-center gap-1.5 px-3 py-1 bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 border dark:border-zinc-700 rounded-lg text-[10px] font-bold text-zinc-600 dark:text-zinc-300 transition-colors"
-                          >
-                            <Eye className="w-3 h-3" />
-                            Visualiser
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="mt-8 flex flex-col sm:flex-row gap-4">
-                    <button 
-                      onClick={onBack}
-                      className="flex-1 py-4 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 rounded-2xl font-bold text-xs hover:bg-zinc-200 transition-all text-center"
-                    >
-                      Retourner au magasin
-                    </button>
-                    {signature && (
-                      <button 
-                        onClick={() => {
-                          generateContractPDF({
-                            companyName: companyName || "Vendeur Eladma",
-                            location: location || "Kananga",
-                            date: new Date().toLocaleDateString('fr-FR'),
-                            signature: signature
-                          }).then(blob => {
-                            const url = URL.createObjectURL(blob);
-                            const link = document.createElement('a');
-                            link.href = url;
-                            link.download = `Contrat_Eladma_Signe_${(companyName || 'Vendeur').replace(/\s+/g, '_')}.pdf`;
-                            link.click();
-                            toast.success("Téléchargement du contrat lancé");
-                          });
-                        }}
-                        className="flex-1 py-4 bg-zinc-900 dark:bg-zinc-950 border border-zinc-800 dark:border-zinc-700 text-white rounded-2xl font-bold text-xs flex items-center justify-center gap-2 hover:bg-zinc-805 transition-all text-center"
-                      >
-                        <FileText className="w-4 h-4 text-brand" />
-                        Obtenir Contrat PDF
-                      </button>
-                    )}
-                  </div>
                 </div>
-              </div>
 
-              {/* Le Portail d'Administration Eladma RDC (Pour la Modération administrative) */}
-              <div className="lg:col-span-5 space-y-6">
-                <div className="bg-zinc-900 border border-zinc-800 text-white rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden">
-                  <div className="absolute top-0 right-0 p-8 text-white/5 pointer-events-none">
-                    <Scale className="w-48 h-48 rotate-12" />
-                  </div>
-                  
-                  <div className="flex items-center gap-3 mb-6 border-b border-zinc-800/80 pb-6 relative z-10">
-                    <div className="w-10 h-10 bg-brand/20 text-brand rounded-xl flex items-center justify-center border border-brand/50">
-                      <Lock className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h3 className="font-extrabold text-sm tracking-wide uppercase text-brand">Vérification Documents</h3>
-                      <p className="text-[10px] text-zinc-400 font-bold uppercase">Backoffice d'approbation administrative RDC</p>
-                    </div>
-                  </div>
-
-                  <p className="text-xs text-zinc-400 leading-relaxed mb-6">
-                    Cette console interne simule l'interface confidentielle d'approbation d'un inspecteur d'Eladma à Kananga. Vous pouvez valider les justificatifs du candidat ou rejeter le dossier en expliquant les motifs.
-                  </p>
-
-                  {/* Candidate overview cards */}
-                  <div className="space-y-4 mb-8 bg-zinc-950/60 p-5 border border-zinc-800/80 rounded-3xl">
-                    <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-1.5">
-                      <UserCheck className="w-3.5 h-3.5 text-brand" />
-                      Candidat à auditer
-                    </h4>
-                    <div className="space-y-2 text-xs">
-                      <div className="flex justify-between py-1 border-b border-zinc-900">
-                        <span className="text-zinc-500">Raison sociale :</span>
-                        <span className="font-bold text-zinc-200">{companyName || "Coopérative Eladma"}</span>
-                      </div>
-                      <div className="flex justify-between py-1 border-b border-zinc-900">
-                        <span className="text-zinc-500">Siège social :</span>
-                        <span className="text-zinc-300">{location || "Kananga, RDC"}</span>
-                      </div>
-                      <div className="flex justify-between py-1 border-b border-zinc-900">
-                        <span className="text-zinc-500">Identité IA-Match :</span>
-                        <span className="text-emerald-400 font-bold flex items-center gap-1">✔ CONFORME (98%)</span>
-                      </div>
-                      <div className="flex justify-between py-1">
-                        <span className="text-zinc-500">Contrat :</span>
-                        <span className="text-emerald-400 font-bold flex items-center gap-1">✔ SIGNÉ</span>
-                      </div>
-                    </div>
-
-                    {/* Previews side by side */}
-                    <div className="grid grid-cols-2 gap-3 pt-2">
-                      <div className="space-y-1">
-                        <span className="text-[9px] text-zinc-500 block">Photo Biométrique :</span>
-                        {selfie ? (
-                          <div className="aspect-square bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800">
-                            <img src={selfie} className="w-full h-full object-cover scale-x-[-1]" alt="Identité" />
-                          </div>
-                        ) : (
-                          <div className="aspect-square bg-zinc-900 rounded-xl border border-zinc-800 border-dashed flex items-center justify-center text-zinc-650 text-[10px]">
-                            Aucun selfie
-                          </div>
-                        )}
-                      </div>
-                      <div className="space-y-1">
-                        <span className="text-[9px] text-zinc-500 block">Signature validée :</span>
-                        {signature ? (
-                          <div className="aspect-square bg-white rounded-xl border border-zinc-800 p-2 flex items-center justify-center">
-                            <img src={signature} className="max-w-full max-h-full object-contain" alt="Signature" />
-                          </div>
-                        ) : (
-                          <div className="aspect-square bg-zinc-900 rounded-xl border border-zinc-800 border-dashed flex items-center justify-center text-zinc-650 text-[10px]">
-                            Aucune signature
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="space-y-4">
-                    {!showRejectForm ? (
-                      <div className="grid grid-cols-1 gap-3">
-                        <button 
-                          onClick={() => {
-                            setVerificationStatus('verified');
-                            localStorage.setItem('eladma-supplier-status', 'verified');
-                            toast.success("Validation administrative accomplie !", {
-                              description: `Le compte de « ${companyName || 'votre coopérative'} » est désormais actif et vérifié !`
-                            });
-                          }}
-                          className="w-full py-4 bg-emerald-500 hover:bg-emerald-650 text-white font-black text-xs rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/10 transition-all uppercase tracking-widest"
-                        >
-                          <ShieldCheck className="w-4 h-4 fill-current" />
-                          Approuver et Activer le compte
-                        </button>
-                        <button 
-                          onClick={() => setShowRejectForm(true)}
-                          className="w-full py-3 bg-zinc-800 hover:bg-zinc-750 text-rose-400 font-bold text-[11px] rounded-2xl flex items-center justify-center gap-2 transition-all uppercase tracking-widest"
-                        >
-                          <FileX className="w-4 h-4" />
-                          Rejeter les pièces justificatives
-                        </button>
-                      </div>
-                    ) : (
-                      <motion.div 
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        className="space-y-4 bg-zinc-950/80 p-5 border border-rose-500/20 rounded-3xl text-xs"
-                      >
-                        <h4 className="font-extrabold text-sm text-rose-400 flex items-center gap-1.5 uppercase tracking-wider">
-                          <FileX className="w-4 h-4" />
-                          Motif de non-conformité
-                        </h4>
-                        
-                        <div className="space-y-2">
-                          <label className="text-[10px] text-zinc-400 font-bold uppercase tracking-wide">Sélectionnez le motif réglementaire :</label>
-                          <select 
-                            value={rejectReasonSelection}
-                            onChange={(e) => {
-                              setRejectReasonSelection(e.target.value);
-                              if (e.target.value !== 'Autre') {
-                                setCustomRejectReason('');
-                              }
-                            }}
-                            className="w-full bg-zinc-900 border border-zinc-850 rounded-xl p-3 outline-none text-zinc-300 focus:ring-1 focus:ring-rose-500 text-xs"
-                          >
-                            <option value="">-- Choisir un motif --</option>
-                            <option value="Pièce d'identité lisible exigée. Le document fourni (CNI / Passeport) est flou ou hors de validité.">Pièce d'identité illisible / expirée</option>
-                            <option value="Numéro d'immatriculation CD/KAN/RCCM non valide sur le greffe officiel de Kananga.">Numéro RCCM erroné ou introuvable</option>
-                            <option value="Défaut d'attestation fiscale de la DGI ou document fourni ne correspondant pas à l'année courante.">Attestation Fiscale invalide</option>
-                            <option value="Signature contractuelle incomplète. Veuillez apposer une signature claire lisible sur le pavé tactile.">Signature non conforme ou incomplète</option>
-                            <option value="Vérification faciale biométrique suspecte. Le selfie ne correspond pas à l'identité du gérant.">Vérification faciale IA rejetée</option>
-                            <option value="Autre">Autre motif personnalisé...</option>
-                          </select>
-                        </div>
-
-                        {(rejectReasonSelection === 'Autre' || rejectReasonSelection === '') && (
-                          <div className="space-y-2">
-                            <label className="text-[10px] text-zinc-400 font-bold uppercase tracking-wide">Spécifiez le motif :</label>
-                            <textarea 
-                              value={customRejectReason}
-                              onChange={(e) => setCustomRejectReason(e.target.value)}
-                              placeholder="Veuillez décrire précisément les éléments manquants ou à corriger..."
-                              rows={3}
-                              className="w-full bg-zinc-900 border border-zinc-855 rounded-xl p-3 outline-none text-zinc-300 focus:ring-1 focus:ring-rose-500 text-xs resize-none"
-                            />
-                          </div>
-                        )}
-
-                        <div className="flex gap-2 pt-2">
-                          <button 
-                            onClick={() => {
-                              setShowRejectForm(false);
-                              setRejectReasonSelection('');
-                              setCustomRejectReason('');
-                            }}
-                            className="flex-1 py-2.5 bg-zinc-800 text-zinc-400 font-bold rounded-xl hover:bg-zinc-750 text-[10px] uppercase tracking-wider transition-all"
-                          >
-                            Annuler
-                          </button>
-                          <button 
-                            onClick={() => {
-                              const finalReason = rejectReasonSelection === 'Autre' ? customRejectReason : rejectReasonSelection;
-                              if (!finalReason || finalReason.trim() === '') {
-                                toast.error("Veuillez renseigner un motif de rejet.");
-                                return;
-                              }
-                              // Set back to unregistered, store rejection reason in localStorage
-                              setVerificationStatus('unregistered');
-                              localStorage.setItem('eladma-supplier-status', 'unregistered');
-                              localStorage.setItem('eladma-supplier-rejection-reason', finalReason);
-                              setRejectionReason(finalReason);
-                              
-                              // Clear temporarily loaded docs to force resubmission
-                              localStorage.removeItem('eladma-supplier-signature');
-                              localStorage.removeItem('eladma-supplier-selfie');
-                              setSignature(null);
-                              setSelfie(null);
-
-                              setShowRejectForm(false);
-                              setRejectReasonSelection('');
-                              setCustomRejectReason('');
-
-                              toast.error("Dossier rejeté avec succès", {
-                                description: "L'utilisateur est prévenu du motif de rejet administratif."
-                              });
-                            }}
-                            className="flex-1 py-2.5 bg-rose-650 hover:bg-rose-700 text-white font-black rounded-xl text-[10px] uppercase tracking-wider transition-all"
-                          >
-                            Valider le Rejet
-                          </button>
-                        </div>
-                      </motion.div>
-                    )}
-                  </div>
+                <div className="mt-8 flex flex-col sm:flex-row gap-4">
+                  <button 
+                    onClick={onBack}
+                    className="flex-1 py-4 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 rounded-2xl font-bold text-xs hover:bg-zinc-200 transition-all text-center"
+                  >
+                    Retourner au magasin
+                  </button>
+                  {signature && (
+                    <button 
+                      onClick={() => {
+                        generateContractPDF({
+                          companyName: companyName || "Vendeur Eladma",
+                          location: location || "Kananga",
+                          date: new Date().toLocaleDateString('fr-FR'),
+                          signature: signature
+                        }).then(blob => {
+                          const url = URL.createObjectURL(blob);
+                          const link = document.createElement('a');
+                          link.href = url;
+                          link.download = `Contrat_Eladma_Signe_${(companyName || 'Vendeur').replace(/\s+/g, '_')}.pdf`;
+                          link.click();
+                          toast.success("Téléchargement du contrat lancé");
+                        });
+                      }}
+                      className="flex-1 py-4 bg-zinc-900 dark:bg-zinc-950 border border-zinc-800 dark:border-zinc-700 text-white rounded-2xl font-bold text-xs flex items-center justify-center gap-2 hover:bg-zinc-805 transition-all text-center"
+                    >
+                      <FileText className="w-4 h-4 text-brand" />
+                      Obtenir Contrat PDF
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -1202,38 +1304,38 @@ export const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ onBack }) 
           </div>
         </header>
 
-        {/* Navigation Tabs */}
-        <div className="flex gap-2 p-1 bg-zinc-200/50 dark:bg-zinc-900/50 rounded-2xl w-fit mb-8 overflow-x-auto max-w-full">
-          {[
-            { id: 'overview', label: "Vue d'ensemble", icon: BarChart3 },
-            { id: 'products', label: 'Produits', icon: Package },
-            { id: 'orders', label: 'Commandes', icon: ShoppingBag },
-            { id: 'payout', label: "Mode de versement", icon: CreditCard },
-            { id: 'api', label: 'Intégration API', icon: Link },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => {
-                haptics.light();
-                sounds.click();
-                setActiveTab(tab.id as any);
-              }}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all whitespace-nowrap relative ${
-                activeTab === tab.id 
-                  ? 'bg-white dark:bg-zinc-800 text-brand shadow-sm' 
-                  : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
-              }`}
-            >
-              <tab.icon className="w-4 h-4" />
-              <span>{tab.label}</span>
-              {tab.id === 'products' && lowStockProductsCount > 0 && (
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-black text-white animate-pulse">
-                  {lowStockProductsCount}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
+         {/* Navigation Tabs */}
+         <div className="flex gap-2 p-1 bg-zinc-200/50 dark:bg-zinc-900/50 rounded-2xl w-fit mb-8 overflow-x-auto max-w-full">
+           {[
+             { id: 'overview', label: "Vue d'ensemble", icon: BarChart3 },
+             { id: 'products', label: 'Produits', icon: Package },
+             { id: 'orders', label: 'Commandes', icon: ShoppingBag },
+             { id: 'payout', label: "Mode de versement", icon: CreditCard },
+             { id: 'api', label: 'Intégration API', icon: Link },
+           ].map((tab) => (
+             <button
+               key={tab.id}
+               onClick={() => {
+                 haptics.light();
+                 sounds.click();
+                 setActiveTab(tab.id as any);
+               }}
+               className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all whitespace-nowrap relative ${
+                 activeTab === tab.id 
+                   ? 'bg-white dark:bg-zinc-800 text-brand shadow-sm font-black scale-102' 
+                   : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
+               }`}
+             >
+               <tab.icon className="w-4 h-4" />
+               <span>{tab.label}</span>
+               {tab.id === 'products' && lowStockProductsCount > 0 && (
+                 <span className="flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-black text-white animate-pulse">
+                   {lowStockProductsCount}
+                 </span>
+               )}
+             </button>
+           ))}
+         </div>
 
         {activeTab === 'overview' && (
           <div className="space-y-8">
@@ -1326,7 +1428,9 @@ export const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ onBack }) 
                         <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
                           La liaison est <strong>active et opérationnelle</strong> vers votre compte de destination :{' '}
                           <strong className="text-zinc-800 dark:text-zinc-200">
-                            {payoutMethod === 'momo' ? `Mobile Money ${momoProvider} (${momoPhone})` : `Bancaire RDC (${bankName})`}
+                            {payoutMethod === 'momo' && `Mobile Money ${momoProvider} (${momoPhone})`}
+                            {payoutMethod === 'bank' && `Bancaire RDC (${bankName})`}
+                            {payoutMethod === 'maxicash' && `MaxiCash Hub (${maxicashEmail})`}
                           </strong>.
                         </p>
                         <span className="text-[10px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-black uppercase tracking-wider">
@@ -1773,8 +1877,8 @@ export const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ onBack }) 
                   <form onSubmit={handleSavePayoutDetails} className="space-y-6">
                     {/* Payment Method Selector */}
                     <div className="space-y-3">
-                      <label className="text-xs font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest block">Type de compte de destination</label>
-                      <div className="grid grid-cols-2 gap-4">
+                      <label className="text-xs font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest block font-sans">Type de compte de destination</label>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <button
                           type="button"
                           onClick={() => {
@@ -1822,11 +1926,36 @@ export const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ onBack }) 
                             <p className="text-[10px] text-zinc-400 mt-1">Rawbank, EquityBCDC, TMB</p>
                           </div>
                         </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPayoutMethod('maxicash');
+                            haptics.medium();
+                            sounds.click();
+                          }}
+                          className={`p-5 rounded-2xl border text-left transition-all flex flex-col justify-between h-32 cursor-pointer ${
+                            payoutMethod === 'maxicash'
+                              ? 'border-brand bg-brand/[0.04] dark:bg-brand/[0.02] ring-2 ring-brand/35'
+                              : 'border-zinc-200 dark:border-zinc-805 hover:border-zinc-300 bg-transparent'
+                          }`}
+                        >
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                            payoutMethod === 'maxicash' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500'
+                          }`}>
+                            <DollarSign className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <span className="text-[8px] bg-brand/10 text-brand font-black px-1.5 py-0.5 rounded uppercase self-start mb-1 block w-fit">MaxiCash Hub</span>
+                            <p className="font-extrabold text-sm dark:text-white leading-tight">Portefeuille MaxiCash</p>
+                            <p className="text-[10px] text-zinc-400 mt-0.5">Virements &amp; Momo Directs</p>
+                          </div>
+                        </button>
                       </div>
                     </div>
 
                     {/* Conditional Input Fields */}
-                    {payoutMethod === 'momo' ? (
+                    {payoutMethod === 'momo' && (
                       <div className="space-y-4">
                         <div className="space-y-1.5">
                           <label className="text-xs font-bold text-zinc-500 uppercase">Opérateur Mobile Money</label>
@@ -1865,7 +1994,9 @@ export const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ onBack }) 
                           />
                         </div>
                       </div>
-                    ) : (
+                    )}
+
+                    {payoutMethod === 'bank' && (
                       <div className="space-y-4">
                         <div className="space-y-1.5">
                           <label className="text-xs font-bold text-zinc-500 uppercase">Établissement Bancaire en RDC</label>
@@ -1921,6 +2052,122 @@ export const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ onBack }) 
                       </div>
                     )}
 
+                    {payoutMethod === 'maxicash' && (
+                      <div className="space-y-4">
+                        <div className="p-4 bg-emerald-500/[0.04] border border-emerald-500/20 rounded-2xl space-y-2">
+                          <div className="flex items-center gap-2">
+                            <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                            <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-450 uppercase tracking-wider">Compte Administrateur Activé</span>
+                          </div>
+                          <p className="text-[11px] text-zinc-550 dark:text-zinc-400 leading-normal">
+                            MaxiCash agrège et distribue en bloc vos royalties vers les comptes mobiles money ou comptes bancaires RDC en une seule intégration. Configurez votre compte ci-dessous.
+                          </p>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-bold text-zinc-500 uppercase">Email Enregistré MaxiCash</label>
+                            <input
+                              type="email"
+                              required
+                              value={maxicashEmail}
+                              onChange={(e) => setMaxicashEmail(e.target.value)}
+                              placeholder="lazard5@maxicash.com"
+                              className="w-full bg-zinc-50 dark:bg-zinc-800 border-none rounded-xl p-4 text-sm outline-none focus:ring-2 focus:ring-brand dark:text-white font-semibold font-mono"
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-bold text-zinc-500 uppercase">Téléphone associé MaxiCash / Momo</label>
+                            <input
+                              type="text"
+                              required
+                              value={maxicashPhone}
+                              onChange={(e) => setMaxicashPhone(e.target.value)}
+                              placeholder="+243 812 345 678"
+                              className="w-full bg-zinc-50 dark:bg-zinc-800 border-none rounded-xl p-4 text-sm outline-none focus:ring-2 focus:ring-brand dark:text-white font-semibold font-mono"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-bold text-zinc-500 uppercase">Titulaire du compte MaxiCash</label>
+                            <input
+                              type="text"
+                              required
+                              value={maxicashHolder}
+                              onChange={(e) => setMaxicashHolder(e.target.value)}
+                              placeholder="ex: Lazard Lumu"
+                              className="w-full bg-zinc-50 dark:bg-zinc-800 border-none rounded-xl p-4 text-sm outline-none focus:ring-2 focus:ring-brand dark:text-white font-medium"
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-bold text-zinc-500 uppercase">Code de Sécurité MaxiCash Pin</label>
+                            <input
+                              type="password"
+                              required
+                              value={maxicashPin}
+                              onChange={(e) => setMaxicashPin(e.target.value)}
+                              placeholder="••••"
+                              maxLength={6}
+                              className="w-full bg-zinc-50 dark:bg-zinc-800 border-none rounded-xl p-4 text-sm outline-none focus:ring-2 focus:ring-brand dark:text-white font-mono tracking-widest"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-zinc-500 uppercase block mb-1">Cible de Routage Automatique</label>
+                          <div className="grid grid-cols-2 gap-4">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setMaxicashPayoutTarget('momo');
+                                haptics.light();
+                              }}
+                              className={`p-3.5 rounded-xl border text-left transition-all ${
+                                maxicashPayoutTarget === 'momo'
+                                  ? 'border-brand bg-brand/[0.04] dark:bg-brand/[0.02]'
+                                  : 'border-zinc-200 dark:border-zinc-805 hover:border-zinc-300'
+                              }`}
+                            >
+                              <p className="text-xs font-black dark:text-white">Routage Mobile Money</p>
+                              <p className="text-[10px] text-zinc-400 mt-0.5">Vers M-Pesa, Orange, Airtel</p>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setMaxicashPayoutTarget('bank');
+                                haptics.light();
+                              }}
+                              className={`p-3.5 rounded-xl border text-left transition-all ${
+                                maxicashPayoutTarget === 'bank'
+                                  ? 'border-brand bg-brand/[0.04] dark:bg-brand/[0.02]'
+                                  : 'border-zinc-200 dark:border-zinc-805 hover:border-zinc-300'
+                              }`}
+                            >
+                              <p className="text-xs font-black dark:text-white">Routage Virement Bancaire</p>
+                              <p className="text-[10px] text-zinc-400 mt-0.5">Vers Rawbank, EquityBCDC, TMB</p>
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="p-3 bg-zinc-50 dark:bg-zinc-950 rounded-xl border dark:border-zinc-855 text-[10px] text-zinc-500 flex justify-between items-center">
+                          <span>Inscrivez-vous ou connectez votre compte :</span>
+                          <a 
+                            href="https://www.maxicashapp.com" 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="bg-brand text-white font-black px-3 py-1.5 rounded-lg hover:scale-103 transition-all inline-flex items-center gap-1 shrink-0"
+                          >
+                            Créer mon compte <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="p-4 bg-zinc-50 dark:bg-zinc-950 rounded-2xl border dark:border-zinc-855 flex gap-3 text-xs text-zinc-500 leading-relaxed">
                       <Lock className="w-5 h-5 text-brand shrink-0" />
                       <p>
@@ -1969,7 +2216,9 @@ export const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ onBack }) 
                     <div className="flex justify-between text-xs text-zinc-400">
                       <span>Destination configurée</span>
                       <span className="font-bold text-zinc-200 truncate max-w-[190px]">
-                        {payoutMethod === 'momo' ? `${momoProvider} (${momoPhone || 'À renseigner'})` : `${bankName} (${bankAccount ?  bankAccount.substring(0, 8) + '...' : 'À renseigner'})`}
+                        {payoutMethod === 'momo' && `${momoProvider} (${momoPhone || 'À renseigner'})`}
+                        {payoutMethod === 'bank' && `${bankName} (${bankAccount ? bankAccount.substring(0, 8) + '...' : 'À renseigner'})`}
+                        {payoutMethod === 'maxicash' && `MaxiCash (${maxicashEmail ? maxicashEmail.split('@')[0] + '...' : 'À renseigner'})`}
                       </span>
                     </div>
                   </div>
@@ -2004,6 +2253,594 @@ export const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ onBack }) 
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
                     Vous vendez directement sur votre vitrine hébergée clé en main par Eladma. Dès qu'un client achète l'un de vos articles, notre plateforme assure la gestion logistique et le paiement. Vos fonds sont reversés en direct sur votre compte financier désigné ci-contre.
                   </p>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {activeTab === 'site_config' && (
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-8"
+          >
+            <div className="bg-white dark:bg-zinc-900 border dark:border-zinc-800 rounded-[2.5rem] p-6 md:p-8 shadow-sm">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b dark:border-zinc-800 pb-6 mb-6">
+                <div>
+                  <h3 className="text-xl font-black dark:text-white flex items-center gap-2">
+                    <Settings className="w-6 h-6 text-brand" />
+                    Configuration de la Plateforme &amp; Politiques Publiques
+                  </h3>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                    Modifiez en temps réel les identifiants de marque, l'annonce défilante supérieure et les politiques légales affichées sur Eladma.
+                  </p>
+                </div>
+                <div className="text-xs bg-amber-500/10 text-amber-500 px-3 py-1.5 rounded-xl font-black uppercase tracking-wider flex items-center gap-1.5 shrink-0 self-start md:self-center">
+                  <ShieldCheck className="w-4 h-4 fill-current" /> Super-Admin Mode
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Site Brand Identity */}
+                <div className="space-y-6">
+                  <h4 className="text-sm font-black dark:text-white text-zinc-800 uppercase tracking-widest border-l-4 border-brand pl-3">
+                    Ajustements Vitrine &amp; Contact d'Assistance
+                  </h4>
+
+                  <div className="space-y-4">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Nom commercial de l'application</label>
+                      <input
+                        type="text"
+                        value={siteName}
+                        onChange={(e) => {
+                          setSiteName(e.target.value);
+                          localStorage.setItem('eladma-site-name', e.target.value);
+                        }}
+                        className="w-full bg-zinc-50 dark:bg-zinc-800 border dark:border-zinc-700 rounded-xl p-3.5 text-xs outline-none focus:ring-2 focus:ring-brand dark:text-white font-extrabold"
+                        placeholder="Eladma RDC"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Bandeau d'Alerte / Annonce Supérieure</label>
+                      <textarea
+                        value={siteAnnouncement}
+                        onChange={(e) => {
+                          setSiteAnnouncement(e.target.value);
+                          localStorage.setItem('eladma-site-announcement', e.target.value);
+                        }}
+                        rows={2}
+                        className="w-full bg-zinc-50 dark:bg-zinc-800 border dark:border-zinc-700/60 rounded-xl p-3.5 text-xs outline-none focus:ring-2 focus:ring-brand dark:text-white leading-relaxed font-semibold resize-none"
+                        placeholder="Bandeau défilant d'annonce générale du haut"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Email Général du Support</label>
+                        <input
+                          type="email"
+                          value={siteContactEmail}
+                          onChange={(e) => {
+                            setSiteContactEmail(e.target.value);
+                            localStorage.setItem('eladma-site-contact-email', e.target.value);
+                          }}
+                          className="w-full bg-zinc-50 dark:bg-zinc-800 border dark:border-zinc-700 rounded-xl p-3.5 text-xs outline-none focus:ring-2 focus:ring-brand dark:text-white font-mono"
+                          placeholder="support@eladma.com"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Téléphone d'Assistance RDC</label>
+                        <input
+                          type="text"
+                          value={siteContactPhone}
+                          onChange={(e) => {
+                            setSiteContactPhone(e.target.value);
+                            localStorage.setItem('eladma-site-contact-phone', e.target.value);
+                          }}
+                          className="w-full bg-zinc-50 dark:bg-zinc-800 border dark:border-zinc-700 rounded-xl p-3.5 text-xs outline-none focus:ring-2 focus:ring-brand dark:text-white font-mono"
+                          placeholder="+243 821 234 567"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-amber-500/[0.04] border border-amber-500/20 rounded-2xl flex gap-3 text-xs text-amber-600 dark:text-amber-400 leading-relaxed font-medium">
+                    <ShieldCheck className="w-5 h-5 text-amber-500 shrink-0" />
+                    <p>
+                      Ces paramètres agissent sur toute l'interface Eladma. Tous les bandeaux défilants d'informations d'assistance s'ajusteront de manière synchrone.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Policies Edits */}
+                <div className="space-y-6">
+                  <h4 className="text-sm font-black dark:text-white text-zinc-800 uppercase tracking-widest border-l-4 border-brand pl-3">
+                    Mise à Jour des Politiques Juridiques &amp; Logistiques
+                  </h4>
+
+                  <div className="space-y-4">
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Politique de Livraison Provinciale</label>
+                        <span className="text-[10px] bg-brand/5 text-brand font-bold px-2 py-0.5 rounded">shipping</span>
+                      </div>
+                      <textarea
+                        value={policyShipping}
+                        onChange={(e) => {
+                          setPolicyShipping(e.target.value);
+                          localStorage.setItem('eladma-policy-override-shipping', e.target.value);
+                        }}
+                        rows={3}
+                        className="w-full bg-zinc-50 dark:bg-zinc-800 border dark:border-zinc-700/60 rounded-xl p-3.5 text-xs outline-none focus:ring-2 focus:ring-brand dark:text-white font-medium font-mono"
+                        placeholder="Entrez le texte de mise à jour pour la livraison (réseau routier, relais à Kananga, etc.)"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between items-center">
+                          <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Politique de Remboursement</label>
+                          <span className="text-[9px] bg-brand/5 text-brand font-bold px-1.5 py-0.5 rounded">refund</span>
+                        </div>
+                        <textarea
+                          value={policyRefund}
+                          onChange={(e) => {
+                            setPolicyRefund(e.target.value);
+                            localStorage.setItem('eladma-policy-override-refund', e.target.value);
+                          }}
+                          rows={3}
+                          className="w-full bg-zinc-50 dark:bg-zinc-800 border dark:border-zinc-700/60 rounded-xl p-3 text-xs outline-none focus:ring-2 focus:ring-brand dark:text-white font-medium"
+                          placeholder="Texte de remboursement"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between items-center">
+                          <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Conditions d'Utilisation</label>
+                          <span className="text-[9px] bg-brand/5 text-brand font-bold px-1.5 py-0.5 rounded">terms</span>
+                        </div>
+                        <textarea
+                          value={policyTerms}
+                          onChange={(e) => {
+                            setPolicyTerms(e.target.value);
+                            localStorage.setItem('eladma-policy-override-terms', e.target.value);
+                          }}
+                          rows={3}
+                          className="w-full bg-zinc-50 dark:bg-zinc-800 border dark:border-zinc-700/60 rounded-xl p-3 text-xs outline-none focus:ring-2 focus:ring-brand dark:text-white font-medium"
+                          placeholder="Texte de CGU"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between items-center">
+                          <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Protection de la Confidentialité</label>
+                          <span className="text-[9px] bg-brand/5 text-brand font-bold px-1.5 py-0.5 rounded">privacy</span>
+                        </div>
+                        <textarea
+                          value={policyPrivacy}
+                          onChange={(e) => {
+                            setPolicyPrivacy(e.target.value);
+                            localStorage.setItem('eladma-policy-override-privacy', e.target.value);
+                          }}
+                          rows={3}
+                          className="w-full bg-zinc-50 dark:bg-zinc-800 border dark:border-zinc-700/60 rounded-xl p-3 text-xs outline-none focus:ring-2 focus:ring-brand dark:text-white font-medium"
+                          placeholder="Texte de protection des données"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between items-center">
+                          <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Notre Mission &amp; Vision</label>
+                          <span className="text-[9px] bg-brand/5 text-brand font-bold px-1.5 py-0.5 rounded">mission</span>
+                        </div>
+                        <textarea
+                          value={policyMission}
+                          onChange={(e) => {
+                            setPolicyMission(e.target.value);
+                            localStorage.setItem('eladma-policy-override-mission', e.target.value);
+                          }}
+                          rows={3}
+                          className="w-full bg-zinc-50 dark:bg-zinc-800 border dark:border-zinc-700/60 rounded-xl p-3 text-xs outline-none focus:ring-2 focus:ring-brand dark:text-white font-medium"
+                          placeholder="Texte d'ambition et mission"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t dark:border-zinc-800 mt-8 pt-8 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    sounds.success();
+                    haptics.success();
+                    toast.success("✅ Politiques & Configurations enregistrées !", {
+                      description: "Toutes les pages légales (Mission, Livraison, Remboursements, CGU) affichent désormais vos amendements réglementaires."
+                    });
+                  }}
+                  className="px-8 py-4 bg-brand text-white font-black text-xs uppercase tracking-wider rounded-2xl hover:scale-102 active:scale-98 transition-all cursor-pointer shadow-lg shadow-brand/20"
+                >
+                  Publier &amp; Propager les Politiques
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {activeTab === 'admin_accounts' && (
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-8"
+          >
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+              {/* Admins list / roster */}
+              <div className="lg:col-span-8 bg-white dark:bg-zinc-900 border dark:border-zinc-800 rounded-[2.5rem] p-6 md:p-8 shadow-sm">
+                <div>
+                  <h3 className="text-xl font-black dark:text-white flex items-center gap-2">
+                    <Users className="w-6 h-6 text-brand" />
+                    Roster des Fonctionnaires &amp; Administrateurs (RDC)
+                  </h3>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                    Gérez les comptes administratifs habilités à auditer, censurer les produits délictueux et réguler la finance d'Eladma RDC.
+                  </p>
+                </div>
+
+                <div className="mt-8 overflow-x-auto">
+                  <table className="w-full border-collapse text-left text-xs text-zinc-500 dark:text-zinc-400">
+                    <thead>
+                      <tr className="border-b dark:border-zinc-800 text-[10px] font-black uppercase text-zinc-400">
+                        <th className="py-4 px-3">Administrateur</th>
+                        <th className="py-4 px-3">Attribution / Rôle</th>
+                        <th className="py-4 px-3">Date d'embauche</th>
+                        <th className="py-4 px-3">Statut</th>
+                        <th className="py-4 px-3 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y dark:divide-zinc-800">
+                      {adminAccounts.map((adm) => (
+                        <tr key={adm.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-950/20 transition-colors">
+                          <td className="py-4 px-3 font-bold dark:text-white">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center font-black text-zinc-650 dark:text-zinc-300">
+                                {adm.name[0]}
+                              </div>
+                              <div>
+                                <p className="font-extrabold text-sm">{adm.name}</p>
+                                <p className="text-[10px] text-zinc-400 font-mono">{adm.email}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-4 px-3">
+                            <span className="font-bold text-zinc-800 dark:text-zinc-200">{adm.role}</span>
+                          </td>
+                          <td className="py-4 px-3 font-mono text-[11px]">{adm.joined}</td>
+                          <td className="py-4 px-3">
+                            {adm.status === 'active' ? (
+                              <span className="px-2.5 py-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-full font-black text-[9px] uppercase tracking-wider">Actif</span>
+                            ) : (
+                              <span className="px-2.5 py-1 bg-zinc-500/10 text-zinc-550 dark:text-zinc-450 rounded-full font-black text-[9px] uppercase tracking-wider">Inactif</span>
+                            )}
+                          </td>
+                          <td className="py-4 px-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                haptics.medium();
+                                sounds.select();
+                                const updated = adminAccounts.map(a => a.id === adm.id ? { ...a, status: (a.status === 'active' ? 'inactive' : 'active') as 'active' | 'inactive' } : a);
+                                setAdminAccounts(updated);
+                                localStorage.setItem('eladma-admin-accounts-list', JSON.stringify(updated));
+                                toast.info(`Compte de ${adm.name} ${adm.status === 'active' ? 'révoqué' : 'réactivé'} avec succès.`);
+                              }}
+                              className="px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700/80 rounded-xl text-[10px] font-black text-zinc-650 dark:text-zinc-250 transition-all cursor-pointer"
+                            >
+                              {adm.status === 'active' ? 'Révoquer' : 'Habiliter'}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Add Admin form */}
+              <div className="lg:col-span-4 bg-white dark:bg-zinc-900 border dark:border-zinc-800 rounded-[2.5rem] p-6 md:p-8 shadow-sm h-fit">
+                <h4 className="text-sm font-black dark:text-white text-zinc-800 uppercase tracking-widest border-l-4 border-brand pl-3">
+                  Créer un compte Admin Eladma
+                </h4>
+                <p className="text-[11px] text-zinc-500 dark:text-zinc-450 mt-2 leading-relaxed">
+                  Ajoutez un nouveau fonctionnaire, auditeur ou collaborateur à la cellule d'étude et de modération des dossiers d'artisanat.
+                </p>
+
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!newAdminName || !newAdminEmail) return;
+                    haptics.success();
+                    sounds.success();
+                    const newAdmin = {
+                      id: `admin-${Date.now()}`,
+                      name: newAdminName,
+                      email: newAdminEmail,
+                      role: newAdminRole,
+                      status: 'active' as const,
+                      joined: new Date().toLocaleDateString('fr-FR')
+                    };
+                    const updated = [...adminAccounts, newAdmin];
+                    setAdminAccounts(updated);
+                    localStorage.setItem('eladma-admin-accounts-list', JSON.stringify(updated));
+                    setNewAdminName('');
+                    setNewAdminEmail('');
+                    toast.success("✅ Administrateur enregistré avec succès !", {
+                      description: `Le compte pour ${newAdminName} est actif et opérationnel.`
+                    });
+                  }}
+                  className="mt-6 space-y-4"
+                >
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Nom &amp; Prénom du fonctionnaire</label>
+                    <input
+                      required
+                      type="text"
+                      value={newAdminName}
+                      onChange={(e) => setNewAdminName(e.target.value)}
+                      className="w-full bg-zinc-50 dark:bg-zinc-800 border dark:border-zinc-750 rounded-xl p-3 text-xs outline-none focus:ring-2 focus:ring-brand dark:text-white"
+                      placeholder="ex: Jean de Dieu Kabeya"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Adresse Email Professionnelle</label>
+                    <input
+                      required
+                      type="email"
+                      value={newAdminEmail}
+                      onChange={(e) => setNewAdminEmail(e.target.value)}
+                      className="w-full bg-zinc-50 dark:bg-zinc-800 border dark:border-zinc-750 rounded-xl p-3 text-xs outline-none focus:ring-2 focus:ring-brand dark:text-white font-mono"
+                      placeholder="j.kabeya@eladma.com"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Niveau de pouvoir / Rôle</label>
+                    <select
+                      value={newAdminRole}
+                      onChange={(e) => setNewAdminRole(e.target.value)}
+                      className="w-full bg-zinc-50 dark:bg-zinc-800 border dark:border-zinc-750 rounded-xl p-3 text-xs outline-none focus:ring-2 focus:ring-brand dark:text-white"
+                    >
+                      <option value="Super-Administrateur Provincial">Super-Administrateur Provincial</option>
+                      <option value="Inspecteur de Conformité">Inspecteur de Conformité</option>
+                      <option value="Modérateur de Produits (Censure)">Modérateur de Produits (Censure)</option>
+                      <option value="Auditeur de Taxes &amp; Royalties">Auditeur de Taxes &amp; Royalties</option>
+                    </select>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full py-3.5 bg-brand text-white font-black text-xs uppercase tracking-wider rounded-xl hover:scale-102 active:scale-98 transition-all cursor-pointer shadow-lg shadow-brand/10 mt-2"
+                  >
+                    Ajouter au Personnel de l'État RDC
+                  </button>
+                </form>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {activeTab === 'partner_audit' && (
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-8"
+          >
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+              {/* Applicants list / queue */}
+              <div className="lg:col-span-4 bg-white dark:bg-zinc-900 border dark:border-zinc-800 rounded-[2.5rem] p-6 md:p-8 shadow-sm">
+                <div>
+                  <h4 className="text-sm font-black dark:text-white text-zinc-800 uppercase tracking-widest border-l-4 border-brand pl-3">
+                    Candidatures d'Artisans locaux
+                  </h4>
+                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-2">
+                    Sélectionnez un dossier déposé par un artisan pour inspecter ses pièces justificatives, son selfie biométrique et son adresse physique complète.
+                  </p>
+                </div>
+
+                <div className="mt-6 space-y-3">
+                  {partnerApplicants.map((app) => (
+                    <button
+                      key={app.id}
+                      type="button"
+                      onClick={() => {
+                        setAuditedApplicantId(app.id);
+                        haptics.medium();
+                        sounds.select();
+                      }}
+                      className={`w-full p-4 rounded-2xl text-left border transition-all flex items-center justify-between cursor-pointer ${
+                        auditedApplicantId === app.id
+                          ? 'border-brand bg-brand/[0.04] dark:bg-brand/[0.02] shadow-sm scale-102'
+                          : 'border-zinc-200/60 dark:border-zinc-805 hover:border-zinc-300 dark:hover:border-zinc-750 bg-transparent'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <img 
+                          src={app.selfie} 
+                          alt="Selfie" 
+                          referrerPolicy="no-referrer"
+                          className="w-10 h-10 rounded-xl object-cover border dark:border-zinc-800 shrink-0" 
+                        />
+                        <div>
+                          <p className="font-extrabold text-sm dark:text-white leading-tight truncate max-w-[150px]">{app.company}</p>
+                          <p className="text-[10px] text-zinc-400 mt-1">{app.city} ({app.province})</p>
+                        </div>
+                      </div>
+                      <div className="shrink-0">
+                        {app.status === 'pending' ? (
+                          <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse block" />
+                        ) : app.status === 'verified' ? (
+                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 block" />
+                        ) : (
+                          <span className="w-2.5 h-2.5 rounded-full bg-rose-500 block" />
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Detail audit page */}
+              <div className="lg:col-span-8 bg-white dark:bg-zinc-900 border dark:border-zinc-800 rounded-[2.5rem] p-6 md:p-8 shadow-sm space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b dark:border-zinc-800 pb-4">
+                  <div className="flex items-center gap-4">
+                    <img 
+                      src={selectedApplicant.selfie} 
+                      alt="Compliance Audit" 
+                      referrerPolicy="no-referrer"
+                      className="w-14 h-14 rounded-2xl object-cover border dark:border-zinc-700" 
+                    />
+                    <div>
+                      <h3 className="text-xl font-black dark:text-white flex items-center gap-1.5 leading-tight">
+                        {selectedApplicant.company}
+                      </h3>
+                      <p className="text-xs text-zinc-500 mt-0.5">
+                        Siège social vérifié : {selectedApplicant.city}, {selectedApplicant.province} (RDC)
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="shrink-0 flex items-center gap-1.5 self-start sm:self-center">
+                    {selectedApplicant.status === 'pending' ? (
+                      <span className="px-3 py-1.5 bg-amber-500/10 text-amber-500 rounded-xl text-xs font-black uppercase tracking-wider animate-pulse">
+                        En Attente d'Audit
+                      </span>
+                    ) : selectedApplicant.status === 'verified' ? (
+                      <span className="px-3 py-1.5 bg-emerald-500/10 text-emerald-500 rounded-xl text-xs font-black uppercase tracking-wider">
+                        Dossier Approuvé
+                      </span>
+                    ) : (
+                      <span className="px-3 py-1.5 bg-rose-500/10 text-rose-500 rounded-xl text-xs font-black uppercase tracking-wider">
+                        Fichiers Rejetés
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Structured detailed business address view */}
+                <div className="bg-zinc-50 dark:bg-zinc-950 p-5 rounded-2xl space-y-2 border dark:border-zinc-800">
+                  <h5 className="text-[10px] uppercase tracking-widest text-brand font-black flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5" />
+                    Adresse Physique Complète de l'Établissement du Commerce
+                  </h5>
+                  <p className="text-xs text-zinc-705 dark:text-zinc-300 font-extrabold pr-4 leading-relaxed">
+                    {selectedApplicant.address}
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  <h4 className="text-xs font-black dark:text-white text-zinc-805 uppercase tracking-widest">
+                    Inspection des pièces soumises par l'artisan
+                  </h4>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {selectedApplicant.documents.map((doc) => (
+                      <div key={doc.id} className="p-4 bg-zinc-50/50 dark:bg-zinc-950/40 border dark:border-zinc-800 rounded-2xl flex flex-col justify-between">
+                        <div className="flex items-center justify-between mb-3">
+                          <label className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">{doc.title}</label>
+                          <span className="text-[10px] font-mono text-zinc-500">{doc.size}</span>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-xl bg-white dark:bg-zinc-805 border dark:border-zinc-700 flex items-center justify-center text-brand shrink-0">
+                            <FileText className="w-5 h-5" />
+                          </div>
+                          <div className="truncate max-w-[200px]">
+                            <p className="text-xs font-bold dark:text-zinc-100 truncate">{doc.name}</p>
+                            <p className="text-[10px] text-zinc-500">Signatures et cachets officiels RDC inclus</p>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 pt-3 border-t border-zinc-150 dark:border-zinc-800/60 flex items-center justify-between">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              sounds.click();
+                              haptics.light();
+                              toast.info(`Vérification formelle de « ${doc.name} » ouverte.`);
+                            }}
+                            className="text-[10px] font-black text-brand uppercase tracking-wider hover:underline"
+                          >
+                            Consulter le document 🔍
+                          </button>
+
+                          <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={doc.check}
+                              onChange={(e) => {
+                                haptics.light();
+                                const checkedState = e.target.checked;
+                                const updatedApplicants = partnerApplicants.map(p => {
+                                  if (p.id === selectedApplicant.id) {
+                                    return {
+                                      ...p,
+                                      documents: p.documents.map(d => d.id === doc.id ? { ...d, check: checkedState } : d)
+                                    };
+                                  }
+                                  return p;
+                                });
+                                setPartnerApplicants(updatedApplicants);
+                                localStorage.setItem('eladma-pending-applicants-list', JSON.stringify(updatedApplicants));
+                              }}
+                              className="accent-brand w-3.5 h-3.5 rounded border-zinc-300 text-brand"
+                            />
+                            <span className="text-[10px] text-zinc-550 dark:text-zinc-400 font-bold">Considérer conforme</span>
+                          </label>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Audit decisions actions */}
+                <div className="border-t dark:border-zinc-800 pt-6 flex flex-wrap gap-3 justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      haptics.medium();
+                      sounds.click();
+                      const updated = partnerApplicants.map(p => p.id === selectedApplicant.id ? { ...p, status: 'rejected' as const } : p);
+                      setPartnerApplicants(updated);
+                      localStorage.setItem('eladma-pending-applicants-list', JSON.stringify(updated));
+                      toast.error(`❌ Dossier de « ${selectedApplicant.company} » rejeté. Notifications envoyées par SMS et email.`);
+                    }}
+                    className="px-6 py-3 bg-rose-500/10 text-rose-600 dark:text-rose-450 text-xs font-black uppercase tracking-wider rounded-xl hover:bg-rose-500/25 transition-all cursor-pointer"
+                  >
+                    Rejeter &amp; Demander correction ⚠️
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      haptics.success();
+                      sounds.success();
+                      const updated = partnerApplicants.map(p => p.id === selectedApplicant.id ? { ...p, status: 'verified' as const } : p);
+                      setPartnerApplicants(updated);
+                      localStorage.setItem('eladma-pending-applicants-list', JSON.stringify(updated));
+                      toast.success(`🎉 Dossier d'artisan validé et certifié avec succès !`, {
+                        description: `Le commerce de ${selectedApplicant.company} a été activé sur la plateforme Eladma.`
+                      });
+                    }}
+                    className="px-6 py-3 bg-emerald-500 text-white text-xs font-black uppercase tracking-wider rounded-xl hover:scale-103 active:scale-97 hover:shadow-lg hover:shadow-emerald-500/15 transition-all cursor-pointer"
+                  >
+                    Approuver et Activer sa vitrine ✅
+                  </button>
                 </div>
               </div>
             </div>
@@ -2196,17 +3033,17 @@ export const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ onBack }) 
       )}
     </div>
 
-      {/* Add Product Modal (Simplified) */}
+      {/* Add Product Modal (Detailed) */}
       {showAddProduct && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowAddProduct(false)} />
           <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }}
+            initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="relative w-full max-w-2xl bg-white dark:bg-zinc-900 rounded-3xl p-8 shadow-2xl"
+            className="relative w-full max-w-2xl bg-white dark:bg-zinc-900 rounded-3xl p-8 shadow-2xl overflow-y-auto max-h-[90vh] custom-scrollbar"
           >
-            <h2 className="text-2xl font-bold mb-6 dark:text-white">Nouveau Produit</h2>
-             <form className="space-y-6" onSubmit={(e) => {
+            <h2 className="text-2xl font-black mb-6 dark:text-white uppercase tracking-wider text-brand">Nouveau Produit</h2>
+            <form className="space-y-6" onSubmit={(e) => {
               e.preventDefault();
               const fData = new FormData(e.currentTarget);
               const prodName = fData.get('productName') as string || '';
@@ -2224,113 +3061,295 @@ export const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ onBack }) 
                 return;
               }
 
-              handleAddSupplierProduct(cleanName, prodPrice, prodStock, prodThreshold, prodCategory, cleanDesc);
+              handleAddSupplierProduct(cleanName, prodPrice, prodStock, prodThreshold, prodCategory, cleanDesc, addProductImage);
               toast.success(`Produit "${cleanName}" ajouté et publié en direct !`);
+              setAddProductImage('');
               setShowAddProduct(false);
             }}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-zinc-500 uppercase">Nom du Produit</label>
-                  <input required name="productName" type="text" className="w-full bg-zinc-50 dark:bg-zinc-800 border-none rounded-xl p-4 outline-none focus:ring-2 focus:ring-brand dark:text-white" placeholder="ex: Casque Bluetooth..." />
+                  <label className="text-xs font-bold text-zinc-500 uppercase">Nom du Produit</label>
+                  <input required name="productName" type="text" className="w-full bg-zinc-50 dark:bg-zinc-800 border dark:border-zinc-700/50 rounded-xl p-4 outline-none focus:ring-2 focus:ring-brand dark:text-white" placeholder="ex: Masque Traditionnel en acajou" />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-zinc-500 uppercase">Prix de vente ({currency})</label>
-                  <input required name="productPrice" type="number" step="0.01" className="w-full bg-zinc-50 dark:bg-zinc-800 border-none rounded-xl p-4 outline-none focus:ring-2 focus:ring-brand dark:text-white" placeholder="0.00" />
+                  <label className="text-xs font-bold text-zinc-500 uppercase">Prix de vente ({currency})</label>
+                  <input required name="productPrice" type="number" step="0.01" min="0.01" className="w-full bg-zinc-50 dark:bg-zinc-800 border dark:border-zinc-700/50 rounded-xl p-4 outline-none focus:ring-2 focus:ring-brand dark:text-white" placeholder="0.00" />
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-zinc-500 uppercase">Catégorie</label>
-                  <select name="productCategory" className="w-full bg-zinc-50 dark:bg-zinc-800 border-none rounded-xl p-4 outline-none focus:ring-2 focus:ring-brand dark:text-white font-bold cursor-pointer">
-                    <option value="Electronics">Électronique (Téléphone, Ordinateur, etc.)</option>
-                    <option value="Furniture">Mobilier & Matériel des meubles (Chaises, Lits, etc.)</option>
-                    <option value="Automotive">Pièces & Outillage (Voitures, Moto, Moulin)</option>
+                  <label className="text-xs font-bold text-zinc-500 uppercase">Catégorie</label>
+                  <select name="productCategory" className="w-full bg-zinc-50 dark:bg-zinc-800 border dark:border-zinc-700/50 rounded-xl p-4 outline-none focus:ring-2 focus:ring-brand dark:text-white font-bold cursor-pointer">
+                    <option value="Artisanat">Artisanat Kasaïen</option>
+                    <option value="Furniture">Mobilier & Matériel (Chaises, Lits, etc.)</option>
+                    <option value="Electronics">Électronique (Téléphone, PC, etc.)</option>
+                    <option value="Automotive">Pièces & Outillage (Voitures, Moulin)</option>
                     <option value="Fashion">Vêtements & Accessoires (Mode)</option>
                     <option value="Home">Maison, Déco & Tableaux</option>
-                    <option value="Artisanat">Artisanat Kasaïen</option>
                     <option value="Beauty">Beauté & Soins</option>
                     <option value="Sports">Sports & Loisirs</option>
                   </select>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-zinc-500 uppercase">Stock Initial</label>
-                  <input name="productStock" required min="0" type="number" defaultValue="10" className="w-full bg-zinc-50 dark:bg-zinc-800 border-none rounded-xl p-4 outline-none focus:ring-2 focus:ring-brand dark:text-white font-bold" />
+                  <label className="text-xs font-bold text-zinc-500 uppercase">Quantité en Stock</label>
+                  <input name="productStock" required min="0" type="number" defaultValue="10" className="w-full bg-zinc-50 dark:bg-zinc-800 border dark:border-zinc-700/50 rounded-xl p-4 outline-none focus:ring-2 focus:ring-brand dark:text-white font-bold" />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-zinc-500 uppercase">Seuil d'Alerte Stock</label>
-                  <input name="productThreshold" required min="0" type="number" defaultValue="5" className="w-full bg-zinc-50 dark:bg-zinc-800 border-none rounded-xl p-4 outline-none focus:ring-2 focus:ring-brand dark:text-white font-bold" />
+                  <label className="text-xs font-bold text-zinc-500 uppercase">Seuil d'Alerte</label>
+                  <input name="productThreshold" required min="0" type="number" defaultValue="5" className="w-full bg-zinc-50 dark:bg-zinc-800 border dark:border-zinc-700/50 rounded-xl p-4 outline-none focus:ring-2 focus:ring-brand dark:text-white font-bold" />
                 </div>
               </div>
+
+              {/* Image upload drop section for add modal */}
               <div className="space-y-2">
-                <label className="text-sm font-bold text-zinc-500 uppercase">Description IA</label>
-                <textarea name="productDesc" required rows={4} className="w-full bg-zinc-50 dark:bg-zinc-800 border-none rounded-xl p-4 outline-none focus:ring-2 focus:ring-brand dark:text-white resize-none" placeholder="Décrivez votre produit, notre IA optimisera le texte pour la vente."></textarea>
+                <label className="text-xs font-bold text-zinc-500 uppercase">Image du Produit</label>
+                <div className="flex flex-col sm:flex-row gap-4 items-center p-4 bg-zinc-50 dark:bg-zinc-800/40 border border-dashed dark:border-zinc-700 rounded-2xl">
+                  <div className="w-24 h-24 rounded-2xl bg-zinc-100 dark:bg-zinc-800 border dark:border-zinc-700 flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
+                    {addProductImage ? (
+                      <img src={addProductImage} alt="Aperçu" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    ) : (
+                      <Camera className="w-8 h-8 text-zinc-400" />
+                    )}
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <div className="flex gap-2">
+                      <label className="cursor-pointer px-4 py-2 bg-brand/10 hover:bg-brand/20 text-brand text-xs font-bold rounded-xl transition-all">
+                        📷 Charger un fichier...
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          className="hidden" 
+                          onChange={(e) => handleProductFileChange(e, false)} 
+                        />
+                      </label>
+                      {addProductImage && (
+                        <button 
+                          type="button" 
+                          onClick={() => setAddProductImage('')} 
+                          className="px-3 py-2 text-xs font-semibold text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-xl transition-colors"
+                        >
+                          Effacer l'image
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-zinc-400 leading-normal">Taille maximale recommandée : 2 Mo (JPG, PNG, WEBP). Vous pouvez aussi utiliser un de nos magnifiques modèles d'artisanat ci-dessous :</p>
+                    
+                    <div className="flex gap-1.5 overflow-x-auto pb-1 max-w-sm sm:max-w-md scrollbar-none">
+                      {[
+                        { name: 'Statue d\'art', url: 'https://images.unsplash.com/photo-1578301978693-85fa9c0320b9?auto=format&fit=crop&w=200&q=80' },
+                        { name: 'Panier tissé', url: 'https://images.unsplash.com/photo-1590736969955-71cc94801759?auto=format&fit=crop&w=200&q=80' },
+                        { name: 'Céramique', url: 'https://images.unsplash.com/photo-1612196808214-b8e1d6145a8c?auto=format&fit=crop&w=200&q=80' },
+                        { name: 'Sac de Raphia', url: 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=200&q=80' },
+                        { name: 'Masque Bois', url: 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=200&q=80' }
+                      ].map((img, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => setAddProductImage(img.url)}
+                          className={`px-2 py-1 bg-zinc-100 dark:bg-zinc-800 text-[10px] text-zinc-600 dark:text-zinc-300 rounded-lg hover:bg-brand/10 dark:hover:bg-brand/20 border transition-all shrink-0 ${
+                            addProductImage === img.url ? 'border-brand text-brand ring-1 ring-brand/30' : 'border-zinc-200 dark:border-zinc-700/50'
+                          }`}
+                        >
+                          {img.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="flex gap-4">
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-zinc-500 uppercase">Description du Produit</label>
+                <textarea name="productDesc" required rows={4} className="w-full bg-zinc-50 dark:bg-zinc-800 border dark:border-zinc-700/50 rounded-xl p-4 outline-none focus:ring-2 focus:ring-brand dark:text-white resize-none" placeholder="Décrivez les matériaux, l'histoire, la taille et les spécificités de votre produit..."></textarea>
+              </div>
+              <div className="flex gap-4 pt-4 border-t dark:border-zinc-800">
                 <button type="button" onClick={() => setShowAddProduct(false)} className="flex-1 py-4 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 rounded-xl font-bold">Annuler</button>
-                <button type="submit" className="flex-[2] py-4 bg-brand text-white rounded-xl font-bold shadow-lg shadow-brand/20">Publier le produit</button>
+                <button type="submit" className="flex-[2] py-4 bg-brand text-white rounded-xl font-bold shadow-lg shadow-brand/20 hover:opacity-90 active:scale-[0.98] transition-all">Publier le produit</button>
               </div>
             </form>
           </motion.div>
         </div>
       )}
 
-      {/* Edit Stock & Threshold Alert Modal */}
+      {/* Edit Existing Product Modal (Full Control) */}
       {editingProduct && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setEditingProduct(null)} />
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="relative w-full max-w-md bg-white dark:bg-zinc-900 rounded-3xl p-8 shadow-2xl"
+            className="relative w-full max-w-2xl bg-white dark:bg-zinc-900 rounded-3xl p-8 shadow-2xl overflow-y-auto max-h-[90vh] custom-scrollbar"
           >
             <div className="flex items-center gap-3 mb-6">
               <div className="p-3 bg-brand/10 text-brand rounded-2xl">
-                <Settings className="w-5 h-5" />
+                <PenTool className="w-5 h-5" />
               </div>
               <div>
-                <h2 className="text-xl font-bold dark:text-white">Ajuster Stock & Alerte</h2>
-                <p className="text-xs text-zinc-500 mt-0.5">Pour {editingProduct.name}</p>
+                <h2 className="text-2xl font-black dark:text-white uppercase tracking-wider text-brand">Modifier le Produit</h2>
+                <p className="text-xs text-zinc-500 mt-0.5">Identifiant unique : #{editingProduct.id}</p>
               </div>
             </div>
 
             <form onSubmit={(e) => {
               e.preventDefault();
               const fData = new FormData(e.currentTarget);
-              const nStock = Number(fData.get('editStock') as string);
-              const nThreshold = Number(fData.get('editThreshold') as string);
+              const eName = fData.get('editName') as string || '';
+              const ePrice = Number(fData.get('editPrice') as string || '0');
+              const eStock = Number(fData.get('editStock') as string || '0');
+              const eThreshold = Number(fData.get('editThreshold') as string || '5');
+              const eCategory = fData.get('editCategory') as string || '';
+              const eDesc = fData.get('editDesc') as string || '';
 
-              handleUpdateProductStockAndThreshold(editingProduct.id, nStock, nThreshold);
+              const cleanName = EladmaSecurity.sanitizeInput(eName);
+              const cleanDesc = EladmaSecurity.sanitizeInput(eDesc);
+
+              if (!cleanName || !cleanDesc) {
+                toast.error("⚠️ Sécurité : Caractères interdits détectés dans les informations du produit.");
+                return;
+              }
+
+              handleUpdateSupplierProduct(editingProduct.id, cleanName, ePrice, eStock, eThreshold, eCategory, cleanDesc, editProductImage);
               setEditingProduct(null);
             }} className="space-y-6">
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-zinc-500 uppercase">Stock Actuel (unités)</label>
-                <input 
-                  type="number" 
-                  min="0" 
-                  name="editStock" 
-                  defaultValue={editingProduct.stock} 
-                  required
-                  className="w-full bg-zinc-50 dark:bg-zinc-800 border-none rounded-xl p-4 outline-none focus:ring-2 focus:ring-brand dark:text-white font-bold text-lg" 
-                />
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <label className="text-xs font-bold text-zinc-500 uppercase">Seuil d'alerte critique</label>
-                  <span className="text-[10px] text-brand bg-brand/10 px-2 py-0.5 font-bold rounded">Seuil</span>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-zinc-500 uppercase">Nom du Produit</label>
+                  <input 
+                    required 
+                    name="editName" 
+                    type="text" 
+                    defaultValue={editingProduct.name}
+                    className="w-full bg-zinc-50 dark:bg-zinc-800 border dark:border-zinc-700/50 rounded-xl p-4 outline-none focus:ring-2 focus:ring-brand dark:text-white" 
+                  />
                 </div>
-                <input 
-                  type="number" 
-                  min="0" 
-                  name="editThreshold" 
-                  defaultValue={editingProduct.threshold} 
-                  required
-                  className="w-full bg-zinc-50 dark:bg-zinc-800 border-none rounded-xl p-4 outline-none focus:ring-2 focus:ring-brand dark:text-white font-bold text-lg" 
-                />
-                <p className="text-xs text-zinc-500">Si le niveau de stock est inférieur ou égal à ce nombre, une alerte visuelle sera générée.</p>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-zinc-500 uppercase">Prix de vente ({currency})</label>
+                  <input 
+                    required 
+                    name="editPrice" 
+                    type="number" 
+                    step="0.01" 
+                    min="0.01"
+                    defaultValue={editingProduct.price}
+                    className="w-full bg-zinc-50 dark:bg-zinc-800 border dark:border-zinc-700/50 rounded-xl p-4 outline-none focus:ring-2 focus:ring-brand dark:text-white" 
+                  />
+                </div>
               </div>
 
-              <div className="flex gap-4 pt-2">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-zinc-500 uppercase">Catégorie</label>
+                  <select 
+                    name="editCategory" 
+                    defaultValue={editingProduct.category}
+                    className="w-full bg-zinc-50 dark:bg-zinc-800 border dark:border-zinc-700/50 rounded-xl p-4 outline-none focus:ring-2 focus:ring-brand dark:text-white font-bold cursor-pointer"
+                  >
+                    <option value="Artisanat">Artisanat Kasaïen</option>
+                    <option value="Furniture">Mobilier & Matériel (Chaises, Lits, etc.)</option>
+                    <option value="Electronics">Électronique (Téléphone, PC, etc.)</option>
+                    <option value="Automotive">Pièces & Outillage (Voitures, Moulin)</option>
+                    <option value="Fashion">Vêtements & Accessoires (Mode)</option>
+                    <option value="Home">Maison, Déco & Tableaux</option>
+                    <option value="Beauty">Beauté & Soins</option>
+                    <option value="Sports">Sports & Loisirs</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-zinc-500 uppercase">Quantité en Stock</label>
+                  <input 
+                    name="editStock" 
+                    required 
+                    min="0" 
+                    type="number" 
+                    defaultValue={editingProduct.stock}
+                    className="w-full bg-zinc-50 dark:bg-zinc-800 border dark:border-zinc-700/50 rounded-xl p-4 outline-none focus:ring-2 focus:ring-brand dark:text-white font-bold" 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-zinc-500 uppercase">Seuil d'Alerte</label>
+                  <input 
+                    name="editThreshold" 
+                    required 
+                    min="0" 
+                    type="number" 
+                    defaultValue={editingProduct.threshold}
+                    className="w-full bg-zinc-50 dark:bg-zinc-800 border dark:border-zinc-700/50 rounded-xl p-4 outline-none focus:ring-2 focus:ring-brand dark:text-white font-bold" 
+                  />
+                </div>
+              </div>
+
+              {/* Image upload drop section for editing modal */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-zinc-500 uppercase">Modifier l'Image du Produit</label>
+                <div className="flex flex-col sm:flex-row gap-4 items-center p-4 bg-zinc-50 dark:bg-zinc-800/40 border border-dashed dark:border-zinc-700 rounded-2xl">
+                  <div className="w-24 h-24 rounded-2xl bg-zinc-100 dark:bg-zinc-800 border dark:border-zinc-700 flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
+                    {editProductImage ? (
+                      <img src={editProductImage} alt="Aperçu" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    ) : (
+                      <Camera className="w-8 h-8 text-zinc-400" />
+                    )}
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <div className="flex gap-2">
+                      <label className="cursor-pointer px-4 py-2 bg-brand/10 hover:bg-brand/20 text-brand text-xs font-bold rounded-xl transition-all">
+                        📷 Remplacer l'image...
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          className="hidden" 
+                          onChange={(e) => handleProductFileChange(e, true)} 
+                        />
+                      </label>
+                      {editProductImage && (
+                        <button 
+                          type="button" 
+                          onClick={() => setEditProductImage('')} 
+                          className="px-3 py-2 text-xs font-semibold text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-xl transition-colors"
+                        >
+                          Effacer l'image
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-zinc-400 leading-normal">Fichiers acceptés : JPG, PNG, WEBP (Max 2 Mo). Vous pouvez aussi utiliser l'un des modèles d'artisanat :</p>
+                    
+                    <div className="flex gap-1.5 overflow-x-auto pb-1 max-w-sm sm:max-w-md scrollbar-none">
+                      {[
+                        { name: 'Statue d\'art', url: 'https://images.unsplash.com/photo-1578301978693-85fa9c0320b9?auto=format&fit=crop&w=200&q=80' },
+                        { name: 'Panier tissé', url: 'https://images.unsplash.com/photo-1590736969955-71cc94801759?auto=format&fit=crop&w=200&q=80' },
+                        { name: 'Céramique', url: 'https://images.unsplash.com/photo-1612196808214-b8e1d6145a8c?auto=format&fit=crop&w=200&q=80' },
+                        { name: 'Sac de Raphia', url: 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=200&q=80' },
+                        { name: 'Masque Bois', url: 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=200&q=80' }
+                      ].map((img, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => setEditProductImage(img.url)}
+                          className={`px-2 py-1 bg-zinc-100 dark:bg-zinc-800 text-[10px] text-zinc-650 dark:text-zinc-300 rounded-lg hover:bg-brand/10 dark:hover:bg-brand/20 border transition-all shrink-0 ${
+                            editProductImage === img.url ? 'border-brand text-brand ring-1 ring-brand/30' : 'border-zinc-200 dark:border-zinc-700/50'
+                          }`}
+                        >
+                          {img.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-zinc-500 uppercase">Description du Produit</label>
+                <textarea 
+                  name="editDesc" 
+                  required 
+                  rows={4} 
+                  defaultValue={editingProduct.description || ''}
+                  className="w-full bg-zinc-50 dark:bg-zinc-800 border dark:border-zinc-700/50 rounded-xl p-4 outline-none focus:ring-2 focus:ring-brand dark:text-white resize-none" 
+                  placeholder="Modifier la description du produit..."
+                ></textarea>
+              </div>
+
+              <div className="flex gap-4 pt-4 border-t dark:border-zinc-800">
                 <button 
                   type="button" 
                   onClick={() => setEditingProduct(null)} 
@@ -2342,7 +3361,7 @@ export const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ onBack }) 
                   type="submit" 
                   className="flex-[2] py-4 bg-brand text-white rounded-xl font-bold shadow-lg shadow-brand/20 hover:opacity-90 active:scale-[0.98] transition-all"
                 >
-                  Confirmer
+                  Sauvegarder les modifications
                 </button>
               </div>
             </form>

@@ -1,4 +1,6 @@
 import { Product } from "../types";
+import { collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType } from './firebase';
 
 export interface Order {
   id: string;
@@ -83,6 +85,60 @@ class OrderManager {
     }
   ];
 
+  private listeners: Set<(orders: Order[]) => void> = new Set();
+
+  constructor() {
+    if (typeof window !== 'undefined') {
+      try {
+        const ordersRef = collection(db, 'orders');
+        // Install dynamic subscription to keep orders synced in real-time
+        onSnapshot(ordersRef, (snapshot) => {
+          const cloudOrders: Order[] = [];
+          snapshot.forEach((doc) => {
+            cloudOrders.push(doc.data() as Order);
+          });
+          
+          if (cloudOrders.length > 0) {
+            // Sort by date descending
+            cloudOrders.sort((a, b) => b.id.localeCompare(a.id));
+            this.orders = cloudOrders;
+          } else {
+            // Seed default order to firestore if database is clean
+            const defaultOrder = this.orders[0];
+            if (defaultOrder) {
+              setDoc(doc(db, 'orders', defaultOrder.id), defaultOrder)
+                .catch((err) => handleFirestoreError(err, OperationType.WRITE, `orders/${defaultOrder.id}`));
+            }
+          }
+          this.notify();
+        }, (err) => {
+          handleFirestoreError(err, OperationType.GET, 'orders');
+        });
+      } catch (err) {
+        console.error("Error setting up real-time orders cloud sync:", err);
+      }
+    }
+  }
+
+  subscribe(listener: (orders: Order[]) => void): () => void {
+    this.listeners.add(listener);
+    // Flush current state immediately on subscription
+    listener([...this.orders]);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  private notify() {
+    this.listeners.forEach((listener) => {
+      try {
+        listener([...this.orders]);
+      } catch (e) {
+        console.error("Error invoking order change listener:", e);
+      }
+    });
+  }
+
   getOrders(): Order[] {
     return this.orders;
   }
@@ -97,7 +153,16 @@ class OrderManager {
       id: 'ELADMA-' + Math.floor(1000 + Math.random() * 9000),
       date: new Date().toISOString().split('T')[0],
     };
-    this.orders.unshift(newOrder);
+    
+    // Optimistic local update
+    this.orders = [newOrder, ...this.orders.filter(o => o.id !== newOrder.id)];
+    this.notify();
+
+    // Async write to Cloud Firestore
+    setDoc(doc(db, 'orders', newOrder.id), newOrder)
+      .then(() => console.log(`Order ${newOrder.id} successfully saved to Cloud!`))
+      .catch((err) => handleFirestoreError(err, OperationType.WRITE, `orders/${newOrder.id}`));
+
     return newOrder;
   }
 
@@ -113,6 +178,14 @@ class OrderManager {
     order.status = 'shipped';
     order.trackingNumber = 'TRK' + Math.random().toString().substr(2, 8);
 
+    // Save update to cloud
+    try {
+      await setDoc(doc(db, 'orders', order.id), order);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, `orders/${order.id}`);
+    }
+    this.notify();
+
     return order;
   }
 
@@ -120,6 +193,12 @@ class OrderManager {
     const index = this.orders.findIndex(o => o.id === orderId);
     if (index !== -1) {
       this.orders[index].status = status;
+      this.notify();
+
+      // Async update in cloud
+      setDoc(doc(db, 'orders', orderId), this.orders[index])
+        .then(() => console.log(`Order status updated to ${status} in cloud`))
+        .catch(err => handleFirestoreError(err, OperationType.WRITE, `orders/${orderId}`));
     }
   }
 }

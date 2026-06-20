@@ -1,9 +1,10 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { Shield, Truck, RefreshCw, Eye, Target, Compass, ArrowLeft, Zap, Award, Store, CheckCircle2, Loader2, Handshake, Megaphone, HelpCircle, ThumbsUp, ThumbsDown, Copy, MessageSquare } from 'lucide-react';
+import { Shield, Truck, RefreshCw, Eye, Target, Compass, ArrowLeft, Zap, Award, Store, CheckCircle2, Loader2, Handshake, Megaphone, HelpCircle, ThumbsUp, ThumbsDown, Copy, MessageSquare, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { askFaqAssistant } from '../services/gemini';
 import { EladmaSecurity } from '../services/security';
+import { PowerComparison } from './PowerComparison';
 
 export type LegalTab = 'mission' | 'privacy' | 'refund' | 'shipping' | 'terms' | 'cookies' | 'careers' | 'blog' | 'seller' | 'partners' | 'advertising' | 'faq';
 
@@ -14,6 +15,29 @@ interface LegalInfoProps {
 
 export const LegalInfo: React.FC<LegalInfoProps> = ({ initialTab, onBack }) => {
   const [activeTab, setActiveTab] = React.useState<LegalTab>(initialTab);
+
+  // Policy overrides saved by site administrators
+  const shippingOverride = React.useMemo(() => localStorage.getItem('eladma-policy-override-shipping') || '', [activeTab]);
+  const refundOverride = React.useMemo(() => localStorage.getItem('eladma-policy-override-refund') || '', [activeTab]);
+  const termsOverride = React.useMemo(() => localStorage.getItem('eladma-policy-override-terms') || '', [activeTab]);
+  const privacyOverride = React.useMemo(() => localStorage.getItem('eladma-policy-override-privacy') || '', [activeTab]);
+  const missionOverride = React.useMemo(() => localStorage.getItem('eladma-policy-override-mission') || '', [activeTab]);
+
+  const renderOverrideBanner = (content: string) => {
+    if (!content) return null;
+    return (
+      <div className="not-prose bg-amber-500/10 border border-amber-500/20 p-5 rounded-2xl space-y-2 mb-6">
+        <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 text-xs font-black uppercase tracking-wider">
+          <ShieldCheck className="w-4 h-4 fill-current text-amber-500" />
+          Mise à jour officielle de l'Administration Eladma
+        </div>
+        <p className="text-[11px] text-zinc-500 dark:text-zinc-450 italic">Cette politique a été mise à jour par l'administration générale d'Eladma et complète ou modifie les règlements standard ci-dessous :</p>
+        <div className="text-sm text-zinc-800 dark:text-zinc-200 whitespace-pre-line font-medium bg-zinc-50 dark:bg-zinc-950 p-4 rounded-xl border dark:border-zinc-800 leading-relaxed">
+          {content}
+        </div>
+      </div>
+    );
+  };
   const [showSellerForm, setShowSellerForm] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [formStep, setFormStep] = React.useState(1);
@@ -37,6 +61,24 @@ export const LegalInfo: React.FC<LegalInfoProps> = ({ initialTab, onBack }) => {
     setActiveTab(initialTab);
     if (initialTab !== 'seller') setShowSellerForm(false);
   }, [initialTab]);
+
+  React.useEffect(() => {
+    if (activeTab) {
+      window.history.replaceState(null, '', `#legal-${activeTab}`);
+    }
+  }, [activeTab]);
+
+  const copyDirectLink = (tabId: string) => {
+    try {
+      const directUrl = `${window.location.origin}${window.location.pathname}#legal-${tabId}`;
+      navigator.clipboard.writeText(directUrl);
+      toast.success("Lien de partage copié ✅", {
+        description: `Le lien direct d'accès à la politique "${tabId.toUpperCase()}" a été enregistré dans le presse-papiers.`
+      });
+    } catch (e) {
+      toast.error("Échec de la copie du lien");
+    }
+  };
 
   const saveFaqToHistory = (question: string, answer: string) => {
     const updated = [{ question, answer }, ...faqHistory.filter(h => h.question !== question)].slice(0, 10);
@@ -140,6 +182,22 @@ export const LegalInfo: React.FC<LegalInfoProps> = ({ initialTab, onBack }) => {
         animate={{ opacity: 1, y: 0 }}
         className="bg-white dark:bg-zinc-900 rounded-3xl p-8 border dark:border-zinc-800 shadow-sm"
       >
+        {/* Dynamic regulatory direct link sharing header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-150 dark:border-zinc-800 pb-5 mb-8">
+          <div className="flex items-center gap-2 text-[10px] text-zinc-400 dark:text-zinc-500 font-extrabold uppercase tracking-widest leading-none">
+            <span className="w-2 h-2 rounded-full bg-brand animate-pulse" />
+            Accès public officiel • Eladma RDC l'État
+          </div>
+          <button
+            onClick={() => copyDirectLink(activeTab)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-brand/10 hover:bg-brand/15 text-brand text-[10px] font-black rounded-xl border border-brand/20 transition-all cursor-pointer uppercase tracking-wider self-start sm:self-center shadow-sm"
+            title="Générer et copier un lien d'accès direct vers cette politique"
+          >
+            <Copy className="w-3.5 h-3.5" />
+            <span>Copier le lien direct</span>
+          </button>
+        </div>
+
         {activeTab === 'mission' && (
           <div className="prose dark:prose-invert max-w-none">
             <div className="flex items-center gap-4 mb-8">
@@ -151,6 +209,8 @@ export const LegalInfo: React.FC<LegalInfoProps> = ({ initialTab, onBack }) => {
                 <p className="text-zinc-500">L'ambition d'Eladma pour le commerce de demain.</p>
               </div>
             </div>
+
+            {renderOverrideBanner(missionOverride)}
 
             <section className="mb-10">
               <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
@@ -439,6 +499,8 @@ export const LegalInfo: React.FC<LegalInfoProps> = ({ initialTab, onBack }) => {
           <div className="prose dark:prose-invert max-w-none">
             <h1 className="text-3xl font-bold mb-6">Politique de Confidentialité</h1>
             <p className="text-zinc-500 mb-8 italic">Dernière mise à jour : 20 Avril 2026</p>
+
+            {renderOverrideBanner(privacyOverride)}
             
             <section className="mb-8">
               <h2 className="text-xl font-bold mb-4">1. Collecte des Données</h2>
@@ -458,9 +520,31 @@ export const LegalInfo: React.FC<LegalInfoProps> = ({ initialTab, onBack }) => {
         )}
 
         {activeTab === 'shipping' && (
-          <div className="prose dark:prose-invert max-w-none">
-            <h1 className="text-3xl font-bold mb-6">Politique de Livraison</h1>
-            
+          <div className="prose dark:prose-invert max-w-none space-y-8">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h1 className="text-3xl font-bold mb-1">Politique de Livraison</h1>
+                <p className="text-sm text-zinc-500 dark:text-zinc-450">Suivi, acheminement et tarifs de transport provinciaux pour la RDC.</p>
+              </div>
+            </div>
+
+            {renderOverrideBanner(shippingOverride)}
+
+            {/* Interactive Route Routing Efficiency Dashboard */}
+            <div className="not-prose bg-zinc-900 border border-zinc-800 p-6 md:p-8 rounded-3xl relative overflow-hidden shadow-2xl shadow-brand/5">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-brand/10 rounded-full blur-3xl pointer-events-none" />
+              <div className="relative z-10 space-y-2 mb-6">
+                <span className="text-[10px] bg-brand text-white font-black px-2.5 py-0.5 rounded-full uppercase tracking-widest leading-none">
+                  Simulateur de Performance Logistique
+                </span>
+                <h3 className="text-lg font-black text-white">Comparez l'efficacité Eladma face aux transitaires mondiaux</h3>
+                <p className="text-xs text-zinc-400 leading-relaxed max-w-xl font-medium">
+                  Modélisez instantanément le coût d'envoi et les temps de transit pour chaque province ou de nombreuses villes relais en RDC.
+                </p>
+              </div>
+              <PowerComparison />
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
               <div className="p-6 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border dark:border-zinc-700">
                 <h3 className="font-bold mb-2">Livraison Standard</h3>
@@ -487,6 +571,8 @@ export const LegalInfo: React.FC<LegalInfoProps> = ({ initialTab, onBack }) => {
         {activeTab === 'refund' && (
           <div className="prose dark:prose-invert max-w-none">
             <h1 className="text-3xl font-bold mb-6">Politique de Remboursement</h1>
+
+            {renderOverrideBanner(refundOverride)}
             
             <section className="mb-8">
               <h2 className="text-xl font-bold mb-4">Droit de Rétractation</h2>
@@ -511,6 +597,8 @@ export const LegalInfo: React.FC<LegalInfoProps> = ({ initialTab, onBack }) => {
         {activeTab === 'terms' && (
           <div className="prose dark:prose-invert max-w-none">
             <h1 className="text-3xl font-bold mb-6">Conditions d'Utilisation</h1>
+
+            {renderOverrideBanner(termsOverride)}
             <section className="mb-8">
               <h2 className="text-xl font-bold mb-4">Acceptation des Conditions</h2>
               <p className="text-zinc-600 dark:text-zinc-400">En accédant au site Eladma, vous acceptez d'être lié par ces conditions d'utilisation, toutes les lois et réglementations applicables.</p>

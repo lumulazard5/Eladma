@@ -1,5 +1,6 @@
 {
   "name": "Eladma",
   "description": "A modern e-commerce platform for global trade, featuring AI-powered product discovery and a seamless shopping experience.",
-  "requestFramePermissions": ["camera", "geolocation", "microphone"]
+  "requestFramePermissions": ["camera", "geolocation", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

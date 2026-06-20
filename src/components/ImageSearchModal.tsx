@@ -1,6 +1,9 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Camera, Upload, Sparkles, RefreshCw, AlertCircle, ShoppingCart, ArrowRight, Eye } from 'lucide-react';
+import { X, Camera, Upload, Sparkles, RefreshCw, AlertCircle, ShoppingCart, ArrowRight, Eye, QrCode } from 'lucide-react';
+import { toast } from 'sonner';
+// @ts-ignore
+import jsQR from 'jsqr';
 import { Product } from '../types';
 import { searchProductsByImage, ImageSearchResult } from '../services/gemini';
 import { useLanguage } from '../context/LanguageContext';
@@ -29,13 +32,18 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   
-  const [activeTab, setActiveTab] = useState<'camera' | 'upload'>('camera');
+  const [activeTab, setActiveTab] = useState<'camera' | 'qr' | 'upload'>('camera');
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<ImageSearchResult | null>(null);
   const [dragActive, setDragActive] = useState(false);
+
+  // QR Code Scanner States
+  const [qrResult, setQrResult] = useState<Product | null>(null);
+  const [scannedCodeText, setScannedCodeText] = useState<string | null>(null);
+  const [isScanningQR, setIsScanningQR] = useState(false);
 
   // Internationalization text
   const t = {
@@ -97,13 +105,115 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
 
   // Manage camera based on tab and modal state
   useEffect(() => {
-    if (isOpen && activeTab === 'camera' && !previewImage) {
+    if (isOpen && (activeTab === 'camera' || activeTab === 'qr') && !previewImage && !qrResult) {
       startCamera();
     } else {
       stopCamera();
     }
     return () => stopCamera();
-  }, [isOpen, activeTab, previewImage]);
+  }, [isOpen, activeTab, previewImage, qrResult]);
+
+  // QR Code detection loop
+  useEffect(() => {
+    let animationFrameId: number;
+    let isMounted = true;
+
+    const tick = () => {
+      if (!isMounted) return;
+      if (activeTab === 'qr' && videoRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA && !qrResult) {
+        const video = videoRef.current;
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth || 480;
+        canvas.height = video.videoHeight || 480;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          try {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const code = jsQR(imageData.data, imageData.width, imageData.height, {
+              inversionAttempts: "dontInvert",
+            });
+            if (code && code.data) {
+              handleQRDetected(code.data);
+              return; // Halt scanner animation frame loop when code is read
+            }
+          } catch (e) {
+            console.error("QR Code scanner error during canvas frame decode:", e);
+          }
+        }
+      }
+      if (activeTab === 'qr' && !qrResult) {
+        animationFrameId = requestAnimationFrame(tick);
+      }
+    };
+
+    if (isOpen && activeTab === 'qr' && !qrResult) {
+      setIsScanningQR(true);
+      const timer = setTimeout(() => {
+        animationFrameId = requestAnimationFrame(tick);
+      }, 400);
+
+      return () => {
+        clearTimeout(timer);
+        isMounted = false;
+        cancelAnimationFrame(animationFrameId);
+        setIsScanningQR(false);
+      };
+    }
+  }, [isOpen, activeTab, qrResult]);
+
+  // Parser and Resolver of scanned QR content
+  const handleQRDetected = (codeData: string) => {
+    haptics.heavy();
+    sounds.success();
+    setScannedCodeText(codeData);
+
+    // Try finding the product:
+    // 1. Direct ID match
+    let found = products.find(p => p.id.toLowerCase() === codeData.trim().toLowerCase());
+    
+    // 2. URL parsing: e.g. "https://eladma.cd/product/p4" -> "p4", or parameters ?id=p1
+    if (!found) {
+      const matchUrl = codeData.match(/(?:id=|product\/|products\/|#|product=)([a-zA-Z0-9_-]+)/i);
+      if (matchUrl && matchUrl[1]) {
+        const extractedId = matchUrl[1].toLowerCase();
+        found = products.find(p => p.id.toLowerCase() === extractedId);
+      }
+    }
+
+    // 3. Match by exact/partial case-insensitive name
+    if (!found) {
+      found = products.find(p => p.name.toLowerCase().includes(codeData.toLowerCase()) || codeData.toLowerCase().includes(p.name.toLowerCase()));
+    }
+
+    // 4. Case-insensitive fallback against product description or category
+    if (!found) {
+      found = products.find(p => p.description.toLowerCase().includes(codeData.toLowerCase()));
+    }
+
+    if (found) {
+      setQrResult(found);
+      toast.success(language === 'fr' ? "Code QR produit détecté !" : "QR Tag match found!", {
+        description: `Produit : ${found.name}`
+      });
+    } else {
+      // Unrecognized external barcode or URL tag
+      setQrResult({
+        id: 'external-qr',
+        name: language === 'fr' ? 'Tag / Code inconnu' : 'Unknown Tag/Code',
+        description: codeData,
+        price: 0,
+        category: 'Artisanat',
+        image: 'https://images.unsplash.com/photo-1541675154750-0444c7d51e8e?auto=format&fit=crop&q=80&w=400',
+        rating: 4.0,
+        reviewCount: 0,
+        reviews: []
+      });
+      toast.warning(language === 'fr' ? "Tag scanné sans correspondance" : "Scanned unrecognized tag", {
+        description: `Contenu : "${codeData.slice(0, 40)}${codeData.length > 40 ? '...' : ''}"`
+      });
+    }
+  };
 
   // Capture current frame from video stream
   const capturePhoto = () => {
@@ -183,8 +293,10 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
     haptics.light();
     setPreviewImage(null);
     setResult(null);
+    setQrResult(null);
+    setScannedCodeText(null);
     setIsAnalyzing(false);
-    if (activeTab === 'camera') {
+    if (activeTab === 'camera' || activeTab === 'qr') {
       startCamera();
     }
   };
@@ -234,32 +346,43 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
 
           {/* Body Content */}
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
-            {!previewImage && (
+            {!previewImage && !qrResult && (
               <>
                 {/* Mode Selector Tabs (only if camera didn't crash) */}
                 {!cameraError && (
                   <div className="flex bg-zinc-950 p-1 rounded-2xl border border-zinc-800/80">
                     <button
-                      onClick={() => { haptics.light(); setActiveTab('camera'); }}
-                      className={`flex-1 py-3 text-xs font-bold rounded-xl transition-all duration-300 flex items-center justify-center gap-2 ${
+                      onClick={() => { haptics.light(); setActiveTab('camera'); resetSearch(); }}
+                      className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer ${
                         activeTab === 'camera'
                           ? 'bg-brand text-white shadow-md'
-                          : 'text-zinc-400 hover:text-white'
+                          : 'text-zinc-450 hover:text-white'
                       }`}
                     >
-                      <Camera className="w-4 h-4" />
-                      <span>{t.cameraTab}</span>
+                      <Camera className="w-3.5 h-3.5" />
+                      <span>{language === 'fr' ? 'Recherche IA' : 'AI Visual'}</span>
                     </button>
                     <button
-                      onClick={() => { haptics.light(); setActiveTab('upload'); }}
-                      className={`flex-1 py-3 text-xs font-bold rounded-xl transition-all duration-300 flex items-center justify-center gap-2 ${
-                        activeTab === 'upload'
+                      onClick={() => { haptics.light(); setActiveTab('qr'); resetSearch(); }}
+                      className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer ${
+                        activeTab === 'qr'
                           ? 'bg-brand text-white shadow-md'
-                          : 'text-zinc-400 hover:text-white'
+                          : 'text-zinc-450 hover:text-white'
                       }`}
                     >
-                      <Upload className="w-4 h-4" />
-                      <span>{t.uploadTab}</span>
+                      <QrCode className="w-3.5 h-3.5" />
+                      <span>Scanner QR</span>
+                    </button>
+                    <button
+                      onClick={() => { haptics.light(); setActiveTab('upload'); resetSearch(); }}
+                      className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer ${
+                        activeTab === 'upload'
+                          ? 'bg-brand text-white shadow-md'
+                          : 'text-zinc-450 hover:text-white'
+                      }`}
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Importer</span>
                     </button>
                   </div>
                 )}
@@ -286,11 +409,45 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
                     <div className="absolute bottom-4 inset-x-0 flex justify-center">
                       <button
                         onClick={capturePhoto}
-                        className="flex items-center gap-2 bg-brand hover:bg-brand-hover text-white font-bold text-xs px-6 py-3 rounded-full shadow-lg shadow-brand/20 active:scale-95 transition-all"
+                        className="flex items-center gap-2 bg-brand hover:bg-brand-hover text-white font-bold text-xs px-6 py-3 rounded-full shadow-lg shadow-brand/20 active:scale-95 transition-all cursor-pointer"
                       >
                         <Camera className="w-4 h-4" />
                         <span>{t.capture}</span>
                       </button>
+                    </div>
+                  </div>
+                ) : activeTab === 'qr' && !cameraError ? (
+                  <div className="relative aspect-video rounded-2xl bg-black border border-zinc-800 overflow-hidden group">
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className="w-full h-full object-cover scale-x-[-1]"
+                    />
+                    
+                    {/* QR Viewfinder scan target overlays */}
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <div className="w-48 h-48 sm:w-56 sm:h-56 border-2 border-dashed border-brand/65 rounded-2xl flex items-center justify-center relative bg-black/10">
+                        {/* Animated Laser Scanning Line */}
+                        <motion.div 
+                          className="absolute left-3 right-3 h-0.5 bg-brand pointer-events-none shadow-[0_0_10px_#ff6400]"
+                          animate={{ top: ['10%', '90%', '10%'] }}
+                          transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
+                        />
+                        
+                        {/* Corner Accents */}
+                        <div className="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-brand rounded-tl-lg"></div>
+                        <div className="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-brand rounded-tr-lg"></div>
+                        <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-4 border-l-4 border-brand rounded-bl-lg"></div>
+                        <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-4 border-r-4 border-brand rounded-br-lg"></div>
+                      </div>
+                    </div>
+
+                    <div className="absolute top-4 inset-x-0 flex justify-center">
+                      <span className="bg-black/80 text-white font-bold text-[10px] px-3.5 py-1.5 rounded-full border border-zinc-800 backdrop-blur uppercase tracking-wider animate-pulse">
+                        {language === 'fr' ? 'Présentez un code QR ou code barre...' : 'Place a QR tag in front...'}
+                      </span>
                     </div>
                   </div>
                 ) : (
@@ -323,8 +480,119 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
               </>
             )}
 
+            {/* Scanned QR Product success panels */}
+            {qrResult && (
+              <motion.div
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="space-y-6"
+              >
+                {/* Header Badge */}
+                <div className="p-5 rounded-3xl bg-brand/10 border border-brand/20 flex flex-col items-center text-center space-y-2">
+                  <div className="p-3 bg-brand/25 rounded-full text-brand animate-pulse">
+                    <QrCode className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-white">
+                      {qrResult.id === 'external-qr' 
+                        ? (language === 'fr' ? 'Code QR détecté avec succès !' : 'QR Tag parsed!')
+                        : (language === 'fr' ? 'Produit identifié par QR code !' : 'QR Product Tag matched!')
+                      }
+                    </h3>
+                    <p className="text-xs text-zinc-400 mt-1">
+                      {qrResult.id === 'external-qr' 
+                        ? (language === 'fr' ? `Contenu brut scanné : ${scannedCodeText}` : `Raw tag content: ${scannedCodeText}`)
+                        : (language === 'fr' ? `Numéro de série du catalogue : ${qrResult.id}` : `Catalog tag ID: ${qrResult.id}`)
+                      }
+                    </p>
+                  </div>
+                </div>
+
+                {/* Match Product representation */}
+                <div className="p-5 rounded-3xl bg-zinc-950 border border-zinc-800 flex flex-col md:flex-row gap-5 items-center justify-between">
+                  <div className="flex flex-col md:flex-row items-center gap-4 text-center md:text-left">
+                    <div className="w-24 h-24 rounded-2xl overflow-hidden bg-zinc-850 border border-zinc-800 flex-shrink-0">
+                      <img 
+                        src={qrResult.image} 
+                        alt={qrResult.name} 
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div>
+                      <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
+                        <span className="text-[9px] px-2 py-0.5 bg-brand text-white font-black uppercase rounded-full tracking-wider">
+                          {qrResult.category}
+                        </span>
+                        {qrResult.isLocal && (
+                          <span className="text-[9px] px-2 py-0.5 bg-zinc-850 text-zinc-300 font-bold rounded-full">
+                            {language === 'fr' ? 'Sourcing Local' : 'Local'}
+                          </span>
+                        )}
+                      </div>
+                      <h4 className="font-extrabold text-white text-base mt-2">{qrResult.name}</h4>
+                      <p className="text-xs text-zinc-400 mt-1 line-clamp-2 max-w-sm">{qrResult.description}</p>
+                      {qrResult.price > 0 && (
+                        <p className="text-sm font-black text-brand mt-2">
+                          {formatPrice(qrResult.price)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex md:flex-col gap-2 w-full md:w-auto mt-4 md:mt-0 shadow-sm shrink-0">
+                    {qrResult.id !== 'external-qr' ? (
+                      <>
+                        <button
+                          onClick={() => {
+                            haptics.medium();
+                            onSelectProduct(qrResult);
+                            onClose();
+                          }}
+                          className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-5 py-3 bg-zinc-800 hover:bg-zinc-750 text-white rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap"
+                        >
+                          <Eye className="w-4 h-4" />
+                          <span>{t.viewDetails}</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            haptics.heavy();
+                            sounds.click();
+                            onAddToCart(qrResult);
+                            toast.success(language === 'fr' ? "Ajouté au panier" : "Added to cart", {
+                              description: `${qrResult.name} est dans votre panier.`
+                            });
+                          }}
+                          className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-5 py-3 bg-brand hover:bg-brand-hover text-white rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap shadow-lg shadow-brand/10"
+                        >
+                          <ShoppingCart className="w-4 h-4" />
+                          <span>{t.addToCart}</span>
+                        </button>
+                      </>
+                    ) : (
+                      <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-[11px] text-zinc-400 font-bold max-w-xs leading-relaxed">
+                        💡 {language === 'fr' 
+                          ? "Ce code n'est pas associé à un produit Eladma, mais vous pouvez chercher ce terme dans la barre principale." 
+                          : "This code isn't registered to an Eladma product, but you can try searching for this tag."
+                        }
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex justify-center pt-2">
+                  <button
+                    onClick={resetSearch}
+                    className="flex items-center gap-2 px-5 py-3 bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 hover:border-zinc-700 text-white text-xs font-bold rounded-xl transition-all cursor-pointer"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    <span>{language === 'fr' ? 'Scanner un autre produit' : 'Scan another product'}</span>
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
             {/* Preview image and analysis processing / results */}
-            {previewImage && (
+            {previewImage && !qrResult && (
               <div className="space-y-6">
                 <div className="relative aspect-video rounded-2xl border border-zinc-800 overflow-hidden bg-black/40 flex items-center justify-center">
                   <img
@@ -433,7 +701,7 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
                                       onSelectProduct(matchedProduct);
                                       onClose();
                                     }}
-                                    className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl text-xs font-bold transition-colors"
+                                    className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-4 py-2 bg-zinc-800 hover:bg-zinc-750 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
                                   >
                                     <Eye className="w-3.5 h-3.5" />
                                     <span>{t.viewDetails}</span>
@@ -443,8 +711,11 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
                                       haptics.heavy();
                                       sounds.click();
                                       onAddToCart(matchedProduct);
+                                      toast.success(language === 'fr' ? "Ajouté au panier" : "Added to cart", {
+                                        description: `${matchedProduct.name} est dans votre panier.`
+                                      });
                                     }}
-                                    className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-4 py-2 bg-brand hover:bg-brand-hover text-white rounded-xl text-xs font-bold transition-colors"
+                                    className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-4 py-2 bg-brand hover:bg-brand-hover text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
                                   >
                                     <ShoppingCart className="w-3.5 h-3.5" />
                                     <span>{t.addToCart}</span>
@@ -456,7 +727,7 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
                         </div>
                       ) : (
                         <div className="text-center py-8 text-zinc-400 flex flex-col items-center justify-center space-y-2">
-                          <AlertCircle className="w-8 h-8 text-zinc-600" />
+                          <AlertCircle className="w-8 h-8 text-zinc-650" />
                           <p className="text-sm font-bold">{t.noMatches}</p>
                         </div>
                       )}

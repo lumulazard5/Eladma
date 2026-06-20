@@ -1,0 +1,54 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Core Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && request.auth.token.role == 'admin';
+    }
+    
+    function isSupplier() {
+      return isAuthenticated() && request.auth.token.role == 'supplier';
+    }
+
+    // Orders Collection: Restricted access
+    match /orders/{orderId} {
+      // Anyone authenticated can place an order
+      allow create: if isAuthenticated();
+      
+      // Read access: Admins, the customer who owns it, or the assigned supplier
+      allow read: if isAuthenticated() && (
+        isAdmin() || 
+        request.auth.uid == resource.data.customerId || 
+        (isSupplier() && request.auth.token.supplierId == resource.data.supplierId)
+      );
+
+      // Write/Update: Admins, or the assigned supplier managing fulfillment
+      allow update: if isAuthenticated() && (
+        isAdmin() || 
+        (isSupplier() && request.auth.token.supplierId == resource.data.supplierId)
+      );
+      
+      // Deletion is strictly reserved for Admins
+      allow delete: if isAdmin();
+    }
+    
+    // Security Threat Logs Collection: Restrict read and updates
+    match /security_threat_logs/{logId} {
+      // Anyone can report/log a threat
+      allow create: if true;
+      // Only admins can read, update, or delete security logs
+      allow read, update, delete: if isAdmin();
+    }
+    
+    // Rewards Collection: User-bound access
+    match /rewards/{userId} {
+      // Users can read/write their own rewards, and admins have full access
+      allow read, write: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+    }
+  }
+}

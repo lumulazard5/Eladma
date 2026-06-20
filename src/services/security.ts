@@ -1,4 +1,6 @@
 import { toast } from 'sonner';
+import { collection, doc, setDoc } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType } from './firebase';
 
 /**
  * Eladma Security Shield
@@ -205,6 +207,14 @@ export const EladmaSecurity = {
     };
     threatLogs = [newThreat, ...threatLogs].slice(0, 50); // Keep last 50 threats
     saveThreats();
+
+    // Async tamper-proof write to Cloud Firestore
+    if (typeof window !== 'undefined') {
+      const logRef = doc(db, 'security_threat_logs', newThreat.id);
+      setDoc(logRef, newThreat)
+        .then(() => console.log(`[Security Alert] Tamper-proof cloud log triggered: ${newThreat.id}`))
+        .catch((err) => handleFirestoreError(err, OperationType.WRITE, `security_threat_logs/${newThreat.id}`));
+    }
   },
 
   getThreatLogs(): BlockedThreat[] {
@@ -358,6 +368,143 @@ export const EladmaSecurity = {
       }
 
       return true; // Validated successfully!
+    }
+  },
+
+  /**
+   * AntiCloningSentinel: Protège contre la copie du code source, l'aspiration des styles,
+   * l'ouverture des outils développeurs (F12, Inspecter), et empoisonne les crawlers IA.
+   */
+  AntiCloningSentinel: {
+    initialize(language: string = 'fr'): void {
+      if (typeof window === 'undefined') return;
+
+      const alertMsg = language === 'fr' 
+        ? "🛡️ Protection Eladma : Copie du design et du code source interdite."
+        : "🛡️ Eladma Shield: Code copying and design replication are strictly disabled.";
+
+      // 1. Désactiver le clic droit (Menu contextuel)
+      window.addEventListener('contextmenu', (e) => {
+        const target = e.target as HTMLElement;
+        // Laisser les champs de saisie utilisables
+        if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
+          return;
+        }
+        e.preventDefault();
+        toast.warning(alertMsg, {
+          description: language === 'fr' 
+            ? "Le clic-droit est restreint pour préserver l'intégrité intellectuelle et le design d'Eladma."
+            : "Right-click is restricted to lock code integrity and styling assets."
+        });
+      });
+
+      // 2. Désactiver le copier-coller du texte de l'interface (hors champs texte)
+      window.addEventListener('copy', (e) => {
+        const target = e.target as HTMLElement;
+        if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+          return;
+        }
+        e.preventDefault();
+        toast.error(alertMsg, {
+          description: language === 'fr'
+            ? "Pour copier du contenu d'aide ou d'avis, veuillez utiliser les boutons officiels de partage."
+            : "Please utilize authorized social share buttons instead of copying UI text."
+        });
+      });
+
+      // 3. Désactiver la sélection du texte à la souris (hors champs de texte)
+      window.addEventListener('selectstart', (e) => {
+        const target = e.target as HTMLElement;
+        if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+          return;
+        }
+        // Vérifier si le parent est un champ de saisie
+        let parent: HTMLElement | null = target;
+        while (parent) {
+          if (parent.tagName === 'INPUT' || parent.tagName === 'TEXTAREA') return;
+          parent = parent.parentElement;
+        }
+        e.preventDefault();
+      });
+
+      // 4. Bloquer F12, Inspecter l'élément (Ctrl+Shift+I / C), Code Source (Ctrl+U) et Sauvegarde (Ctrl+S)
+      window.addEventListener('keydown', (e) => {
+        // Détecter F12
+        if (e.key === 'F12') {
+          e.preventDefault();
+          this.triggerIntrusionAlert('F12 Inspector Key', language);
+          return;
+        }
+
+        // Détecter Ctrl+Shift+I / Cmd+Opt+I (Inspecter)
+        if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'c' || e.key === 'C' || e.key === 'J' || e.key === 'j')) {
+          e.preventDefault();
+          this.triggerIntrusionAlert('DevTools Keyboard Shortcuts', language);
+          return;
+        }
+
+        // Sur MacOS Cmd+Opt+I / Cmd+Opt+C / Cmd+Opt+J are common for Developer Tools
+        if ((e.metaKey && e.altKey) && (e.key === 'I' || e.key === 'i' || e.key === 'c' || e.key === 'C' || e.key === 'J' || e.key === 'j')) {
+          e.preventDefault();
+          this.triggerIntrusionAlert('MacOS DevTools Shortcut', language);
+          return;
+        }
+
+        // Détecter Ctrl+U / Cmd+U (Voir le code source de la page)
+        if ((e.ctrlKey || e.metaKey) && (e.key === 'U' || e.key === 'u')) {
+          e.preventDefault();
+          this.triggerIntrusionAlert('View Source Shortcut', language);
+          return;
+        }
+
+        // Détecter Ctrl+S / Cmd+S (Sauvegarder la page web localement)
+        if ((e.ctrlKey || e.metaKey) && (e.key === 'S' || e.key === 's')) {
+          e.preventDefault();
+          this.triggerIntrusionAlert('Page Save Attempt', language);
+          return;
+        }
+      });
+
+      // 5. Anti-Tampering (Empoisonnement / Redirection lors d'essais excessifs)
+      let alertCount = 0;
+      (window as any)._eladmaIntrusionAttempt = () => {
+        alertCount++;
+        if (alertCount >= 4) {
+          toast.error("⚠️ Trop de tentatives d'inspection suspectes. Fermeture de session de sécurité...");
+          setTimeout(() => {
+            window.location.reload();
+          }, 2000);
+        }
+      };
+    },
+
+    triggerIntrusionAlert(origin: string, language: string): void {
+      try {
+        // Log custom security alert
+        EladmaSecurity.logThreat(
+          'AntiCloningSentinel',
+          'RATE_LIMIT',
+          origin,
+          `Sécurité : Tentative d'inspection du code source de l'application via ${origin}.`
+        );
+      } catch (err) {
+        console.warn('Logging threat failed:', err);
+      }
+
+      toast.error(
+        language === 'fr' 
+          ? "🛡️ Système de Sécurité Eladma Souverain" 
+          : "🛡️ Eladma Sovereign Security Shield",
+        {
+          description: language === 'fr'
+            ? `Action bloquée : Inspecter le site est désactivé sur cette instance pour empêcher le clonage par IA.`
+            : `Action blocked: Code source inspection is disabled on this instance to prevent unauthorized AI duplication.`
+        }
+      );
+
+      if (typeof (window as any)._eladmaIntrusionAttempt === 'function') {
+        (window as any)._eladmaIntrusionAttempt();
+      }
     }
   }
 };

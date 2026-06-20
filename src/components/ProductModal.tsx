@@ -193,6 +193,39 @@ export const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, on
     }
   };
 
+  const handleShareWhatsApp = () => {
+    haptics.medium();
+    sounds.select();
+
+    const shareUrl = `${window.location.origin}/?product=${product.id}`;
+    const formattedPrice = formatPrice(product.price);
+    
+    // Nettoyer et limiter la description
+    const cleanDesc = product.description.length > 120 
+      ? product.description.slice(0, 117) + "..." 
+      : product.description;
+
+    const message = language === 'fr'
+      ? `🛍️ *${product.name}*\n\n💰 *Prix :* ${formattedPrice}\n📝 *Description :* ${cleanDesc}\n\n👉 Découvrez ce produit sur Eladma :\n🔗 ${shareUrl}`
+      : `🛍️ *${product.name}*\n\n💰 *Price :* ${formattedPrice}\n📝 *Description :* ${cleanDesc}\n\n👉 Discover this product on Eladma :\n🔗 ${shareUrl}`;
+
+    const encodedMessage = encodeURIComponent(message);
+    const whatsappUrl = `https://api.whatsapp.com/send?text=${encodedMessage}`;
+    window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+    toast.success(language === 'fr' ? "Redirection vers WhatsApp..." : "Redirecting to WhatsApp...");
+  };
+
+  const handleShareFacebook = () => {
+    haptics.medium();
+    sounds.select();
+
+    const shareUrl = `${window.location.origin}/?product=${product.id}`;
+    const facebookUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`;
+    
+    window.open(facebookUrl, '_blank', 'noopener,noreferrer');
+    toast.success(language === 'fr' ? "Redirection vers Facebook..." : "Redirecting to Facebook...");
+  };
+
 
   const handleSubmitReview = (e: React.FormEvent) => {
     e.preventDefault();
@@ -604,15 +637,47 @@ export const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, on
                   
                   <button
                     onClick={handleShare}
-                    className="px-5 py-4 border border-zinc-205 dark:border-zinc-800 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 rounded-xl font-bold transition-all flex items-center justify-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-900"
-                    title={language === 'fr' ? "Partager ce produit" : "Share this product"}
+                    className="px-5 py-4 border border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 rounded-xl font-bold transition-all flex items-center justify-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-900"
+                    title={language === 'fr' ? "Plus d'options de partage" : "More share options"}
                     id="product-share-btn"
                   >
                     <Share2 className="w-5 h-5" />
                     <span className="hidden sm:inline text-xs">
-                      {language === 'fr' ? "Partager" : "Share"}
+                      {language === 'fr' ? "Lien" : "Link"}
                     </span>
                   </button>
+                </div>
+
+                {/* Groupe de partage réseaux sociaux direct */}
+                <div className="bg-zinc-50 dark:bg-zinc-950 p-4 rounded-2xl border border-zinc-150 dark:border-zinc-850 flex flex-col gap-2.5">
+                  <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest flex items-center gap-1.5 select-none">
+                    <Share2 className="w-3.5 h-3.5 text-brand" /> {language === 'fr' ? "Partager sur vos réseaux" : "Share details on socials"}
+                  </span>
+                  <div className="grid grid-cols-2 gap-2">
+                    {/* Partager sur WhatsApp */}
+                    <button
+                      onClick={handleShareWhatsApp}
+                      className="px-4 py-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 dark:border-emerald-500/30 rounded-xl font-extrabold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                      title={language === 'fr' ? "Partager sur WhatsApp avec description et prix" : "Share on WhatsApp with description and price"}
+                    >
+                      <svg className="w-4 h-4 fill-current shrink-0 text-emerald-500" viewBox="0 0 24 24">
+                        <path d="M17.472 14.382c-.022-.08-.124-.132-.262-.202-.138-.07-1.182-.583-1.365-.649-.182-.065-.315-.1-.45.1-.133.197-.52.65-.637.785-.117.135-.235.15-.472.03-.237-.12-1.002-.37-1.91-1.18-.707-.63-1.183-1.41-1.322-1.649-.14-.238-.015-.367.104-.486.108-.107.237-.275.355-.412.12-.138.16-.23.237-.384.077-.154.038-.288-.02-.407-.058-.12-.45-1.085-.615-1.485-.162-.392-.325-.34-.45-.348-.117-.008-.25-.01-.382-.01-.133 0-.35.05-.533.25-.183.2-.7 0 .685-.7 1.705 0 .17.3 1.13 0 .43.2 0 .52.04.66.19c.14.15.54.85.58.91c.04.06.07.13.06.2c-.02.07-.15.22-.24.33-.1.11-.2.24-.31.35c-.12.12-.24.25-.1.49c.14.24.63 1.03 1.34 1.66c.92.8 1.7 1.05 1.94 1.17c.24.12.38.1.52-.06c.14-.17.6-.7.76-.94c.16-.24.32-.2.54-.12c.22.08 1.4.66 1.64.78c.24.12.39.18.45.28c.06.1.06.57-.16 1.2c-.22.63-1.28 1.24-1.78 1.29c-.5.05-1.1.02-3.1-1.06c-2.4-1.3-3.9-3.75-4-3.95c-.1-.2-1.7-2.25-1.7-4.3c0-2.05 1.05-3.05 1.45-3.45c.4-.4.8-.5 1-.5c.2 0 .4 0 .58.01c.18.01.4-.07.63.15c.23.22.88 2.15.96 2.3c.08.15.08.33-.02.5c-.1.17-.2.28-.35.45c-.15.17-.3.38-.43.5c-.15.15-.3.32-.12.63c.18.3 1.2 1.95 2.6 3.1c1.3 1.05 2.45 1.35 2.8 1.5c.35.15.55.12.75-.1c.2-.23.85-.98 1.08-1.3c.23-.33.45-.28.75-.16H17.472zM12 2C6.478 2 2 6.478 2 12c0 1.91.5 3.71 1.45 5.28L2.1 21.9l4.75-1.25C8.29 21.55 10.1 22 12 22c5.522 0 10-4.478 10-10S17.522 2 12 2z"/>
+                      </svg>
+                      <span>WhatsApp</span>
+                    </button>
+
+                    {/* Partager sur Facebook */}
+                    <button
+                      onClick={handleShareFacebook}
+                      className="px-4 py-3 bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/20 dark:border-blue-500/30 rounded-xl font-extrabold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                      title={language === 'fr' ? "Partager sur Facebook" : "Share on Facebook"}
+                    >
+                      <svg className="w-4 h-4 fill-current shrink-0 text-blue-500" viewBox="0 0 24 24">
+                        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                      </svg>
+                      <span>Facebook</span>
+                    </button>
+                  </div>
                 </div>
                 
                 <div className="flex gap-3">

@@ -13,6 +13,7 @@ interface CategoryBarProps {
   filters: ProductFilters;
   onFiltersChange: (filters: ProductFilters) => void;
   products?: Product[];
+  onOpenAdvancedSearch?: () => void;
 }
 
 const categories: Category[] = ['All', 'Artisanat', 'Electronics', 'Fashion', 'Home', 'Beauty', 'Sports', 'Furniture', 'Automotive'];
@@ -22,7 +23,8 @@ export const CategoryBar: React.FC<CategoryBarProps> = ({
   onSelect, 
   filters, 
   onFiltersChange,
-  products = []
+  products = [],
+  onOpenAdvancedSearch
 }) => {
   const { t, translateCategory } = useLanguage();
   const { formatPrice } = useCurrency();
@@ -67,7 +69,21 @@ export const CategoryBar: React.FC<CategoryBarProps> = ({
           ))}
         </div>
 
-        <div className="relative ml-4">
+        <div className="relative ml-4 flex items-center gap-2">
+          {onOpenAdvancedSearch && (
+            <button
+              onClick={() => {
+                haptics.heavy();
+                sounds.success();
+                onOpenAdvancedSearch();
+              }}
+              className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-orange-500/10 to-brand/10 hover:from-orange-500/20 hover:to-brand/20 text-brand border border-brand/20 dark:border-brand/35 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap"
+              title="Accéder aux filtres de recherche avancée"
+            >
+              <span>Recherche Avancée</span>
+              <span className="text-[10px]">⚡</span>
+            </button>
+          )}
           <button 
             onClick={() => {
               haptics.medium();

@@ -79,6 +79,10 @@ export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({
         label = 'Catalogue';
         icon = ShoppingBag;
         break;
+      case 'catalog-structure':
+        label = 'Architecture & Moteur de Recherche';
+        icon = Landmark;
+        break;
       case 'checkout':
         label = 'Caisse et Paiement';
         icon = Tag;
