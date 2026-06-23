@@ -17,6 +17,7 @@ interface ImageSearchModalProps {
   products: Product[];
   onSelectProduct: (product: Product) => void;
   onAddToCart: (product: Product) => void;
+  initialTab?: 'camera' | 'qr' | 'upload';
 }
 
 export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
@@ -24,7 +25,8 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
   onClose,
   products,
   onSelectProduct,
-  onAddToCart
+  onAddToCart,
+  initialTab = 'camera'
 }) => {
   const { language } = useLanguage();
   const { formatPrice } = useCurrency();
@@ -32,7 +34,7 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   
-  const [activeTab, setActiveTab] = useState<'camera' | 'qr' | 'upload'>('camera');
+  const [activeTab, setActiveTab] = useState<'camera' | 'qr' | 'upload'>(initialTab);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
@@ -44,6 +46,18 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
   const [qrResult, setQrResult] = useState<Product | null>(null);
   const [scannedCodeText, setScannedCodeText] = useState<string | null>(null);
   const [isScanningQR, setIsScanningQR] = useState(false);
+
+  // Sync activeTab when modal is re-opened with a different initialTab
+  useEffect(() => {
+    if (isOpen) {
+      setActiveTab(initialTab);
+      // Reset state for a fresh search when modal opens
+      setPreviewImage(null);
+      setResult(null);
+      setQrResult(null);
+      setScannedCodeText(null);
+    }
+  }, [isOpen, initialTab]);
 
   // Internationalization text
   const t = {

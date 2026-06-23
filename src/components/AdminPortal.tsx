@@ -292,7 +292,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onBack }) => {
   // Site general configurations
   const [siteName, setSiteName] = useState(() => localStorage.getItem('eladma-site-name') || 'Eladma RDC');
   const [siteAnnouncement, setSiteAnnouncement] = useState(() => localStorage.getItem('eladma-site-announcement') || '🚀 Bienvenue sur la première marketplace inclusive de la RDC ! Services financiers MPesa & Rawbank intégrés.');
-  const [siteContactEmail, setSiteContactEmail] = useState(() => localStorage.getItem('eladma-site-contact-email') || 'support@eladma.com');
+  const [siteContactEmail, setSiteContactEmail] = useState(() => localStorage.getItem('eladma-site-contact-email') || 'eladmastore@gmail.com');
   const [siteContactPhone, setSiteContactPhone] = useState(() => localStorage.getItem('eladma-site-contact-phone') || '+243 821 234 567');
 
   // Interactive Policy Overrides State

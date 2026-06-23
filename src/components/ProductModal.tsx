@@ -322,10 +322,40 @@ export const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, on
 
               {/* Section prix avec détail de taxes et dédouanement */}
               <div className="p-4 bg-zinc-50 dark:bg-zinc-800/40 rounded-2xl border border-zinc-100 dark:border-zinc-800/80 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-2xl font-black text-brand">{formatPrice(product.price)}</div>
-                    <div className="text-[10px] text-zinc-400 dark:text-zinc-500 font-semibold uppercase tracking-wider mt-0.5">Taxes & Dédouanement Inclus</div>
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-4 flex-1">
+                    <div>
+                      <div className="text-2xl font-black text-brand">{formatPrice(product.price)}</div>
+                      <div className="text-[10px] text-zinc-400 dark:text-zinc-500 font-semibold uppercase tracking-wider mt-0.5">Taxes & Dédouanement Inclus</div>
+                    </div>
+                    
+                    {/* Sparkline mini-graphique d'évolution */}
+                    <div className="hidden sm:flex flex-col justify-center w-28 h-10 relative group/spark cursor-pointer" title="Historique de prix (30j)">
+                      <div className="w-full h-7">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={priceHistory} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
+                            <defs>
+                              <linearGradient id="colorSparkPrice" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor={priceStats.isRising ? "#EF4444" : "#10B981"} stopOpacity={0.25}/>
+                                <stop offset="95%" stopColor={priceStats.isRising ? "#EF4444" : "#10B981"} stopOpacity={0}/>
+                              </linearGradient>
+                            </defs>
+                            <Area 
+                              type="monotone" 
+                              dataKey="price" 
+                              stroke={priceStats.isRising ? "#EF4444" : "#10B981"} 
+                              strokeWidth={1.5} 
+                              dot={false}
+                              fillOpacity={1}
+                              fill="url(#colorSparkPrice)"
+                            />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <span className="text-[8px] font-black tracking-wider text-zinc-400 uppercase mt-0.5 inline-flex items-center gap-1 group-hover/spark:text-brand transition-colors">
+                        Tendance : <span className={priceStats.isRising ? "text-rose-500 font-bold" : "text-emerald-500 font-black"}>{priceStats.priceDiffStr}</span>
+                      </span>
+                    </div>
                   </div>
                   {product.seller && (
                     <div className="text-xs text-zinc-500 dark:text-zinc-400 text-right">

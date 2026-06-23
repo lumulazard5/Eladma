@@ -41,7 +41,10 @@ const SecurityConsole = React.lazy(() => import('./components/SecurityConsole').
 const UserProfile = React.lazy(() => import('./components/UserProfile').then(m => ({ default: m.UserProfile })));
 const CatalogStructureView = React.lazy(() => import('./components/CatalogStructureView').then(m => ({ default: m.CatalogStructureView })));
 const AdminPortal = React.lazy(() => import('./components/AdminPortal').then(m => ({ default: m.AdminPortal })));
+const GoogleChatCenter = React.lazy(() => import('./components/GoogleChatCenter').then(m => ({ default: m.GoogleChatCenter })));
+const GmailCenter = React.lazy(() => import('./components/GmailCenter').then(m => ({ default: m.GmailCenter })));
 import { AdminGuard } from './components/AdminGuard';
+import { PolicyLink } from './components/PolicyLink';
 
 const LazyLoadingSpinner = () => (
   <div className="h-[450px] w-full flex flex-col items-center justify-center gap-4 text-zinc-400 dark:text-zinc-500">
@@ -74,7 +77,10 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAIOpen, setIsAIOpen] = useState(false);
   const [isImageSearchOpen, setIsImageSearchOpen] = useState(false);
+  const [imageSearchTab, setImageSearchTab] = useState<'camera' | 'qr' | 'upload'>('camera');
   const [isSecurityConsoleOpen, setIsSecurityConsoleOpen] = useState(false);
+  const [isGoogleChatOpen, setIsGoogleChatOpen] = useState(false);
+  const [isGmailOpen, setIsGmailOpen] = useState(false);
   const [blockedThreatsCount, setBlockedThreatsCount] = useState(0);
   const [isCategoryMenuOpen, setIsCategoryMenuOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -586,7 +592,12 @@ export default function App() {
           if (v === 'categories') setIsCategoryMenuOpen(true);
           else setView(v);
         }}
-        onOpenImageSearch={() => setIsImageSearchOpen(true)}
+        onOpenImageSearch={(tab) => {
+          if (tab) setImageSearchTab(tab);
+          setIsImageSearchOpen(true);
+        }}
+        onOpenGoogleChat={() => setIsGoogleChatOpen(true)}
+        onOpenGmail={() => setIsGmailOpen(true)}
       />
 
       <Breadcrumbs 
@@ -638,7 +649,10 @@ export default function App() {
             onFiltersChange={setFilters}
             searchQuery={searchQuery}
             onSearchQueryChange={setSearchQuery}
-            onOpenImageSearch={() => setIsImageSearchOpen(true)}
+            onOpenImageSearch={(tab) => {
+              if (tab) setImageSearchTab(tab);
+              setIsImageSearchOpen(true);
+            }}
           />
         ) : view === 'contact' ? (
           <ContactForm />
@@ -994,7 +1008,7 @@ export default function App() {
                   </button>
                 </form>
                 <p className="mt-5 text-[11px] text-white/60">
-                  En vous inscrivant, vous acceptez nos <span className="underline cursor-pointer font-black" onClick={() => { setView('legal'); setLegalTab('mission'); }}>conditions d'utilisation</span> et notre <span className="underline cursor-pointer font-black" onClick={() => { setView('legal'); setLegalTab('privacy'); }}>politique de confidentialité</span>.
+                  En vous inscrivant, vous acceptez nos <PolicyLink tab="terms" setView={setView} setLegalTab={setLegalTab} className="underline cursor-pointer font-black hover:text-white transition-colors">conditions d'utilisation</PolicyLink> et notre <PolicyLink tab="privacy" setView={setView} setLegalTab={setLegalTab} className="underline cursor-pointer font-black hover:text-white transition-colors">politique de confidentialité</PolicyLink>.
                 </p>
               </div>
             </section>
@@ -1010,37 +1024,37 @@ export default function App() {
             <div>
               <h3 className="font-bold mb-4 dark:text-zinc-100">À propos d'Eladma</h3>
               <ul className="space-y-2 text-sm text-zinc-500 dark:text-zinc-400">
-                <li className="hover:text-brand cursor-pointer transition-colors" onClick={() => { setView('catalog'); }}>Consulter le Catalogue</li>
-                <li className="hover:text-brand cursor-pointer transition-colors font-semibold text-brand" onClick={() => { setView('catalog-structure'); }}>Structure &amp; Algorithmes du Catalogue</li>
-                <li className="hover:text-brand cursor-pointer transition-colors" onClick={() => { setView('legal'); setLegalTab('mission'); }}>Notre mission & vision</li>
-                <li className="hover:text-brand cursor-pointer transition-colors" onClick={() => { setView('legal'); setLegalTab('careers'); }}>Carrières</li>
-                <li className="hover:text-brand cursor-pointer transition-colors" onClick={() => { setView('legal'); setLegalTab('blog'); }}>Blog</li>
+                <li><PolicyLink view="catalog" setView={setView}>Consulter le Catalogue</PolicyLink></li>
+                <li><PolicyLink view="catalog-structure" setView={setView} className="hover:text-brand cursor-pointer transition-colors font-semibold text-brand">Structure &amp; Algorithmes du Catalogue</PolicyLink></li>
+                <li><PolicyLink tab="mission" setView={setView} setLegalTab={setLegalTab}>Notre mission & vision</PolicyLink></li>
+                <li><PolicyLink tab="careers" setView={setView} setLegalTab={setLegalTab}>Carrières</PolicyLink></li>
+                <li><PolicyLink tab="blog" setView={setView} setLegalTab={setLegalTab}>Blog</PolicyLink></li>
               </ul>
             </div>
             <div>
               <h3 className="font-bold mb-4 dark:text-zinc-100">Service Client</h3>
               <ul className="space-y-2 text-sm text-zinc-500 dark:text-zinc-400">
-                <li className="cursor-pointer hover:text-brand transition-colors" onClick={() => setView('contact')}>Centre d'aide</li>
-                <li className="cursor-pointer hover:text-brand transition-colors" onClick={() => { setView('legal'); setLegalTab('refund'); }}>Retours & Remboursements</li>
-                <li className="cursor-pointer hover:text-brand transition-colors" onClick={() => setView('tracking')}>Suivi de commande</li>
-                <li className="cursor-pointer hover:text-brand transition-colors" onClick={() => { setView('legal'); setLegalTab('shipping'); }}>Politique de livraison</li>
+                <li><PolicyLink view="contact" setView={setView}>Centre d'aide</PolicyLink></li>
+                <li><PolicyLink tab="refund" setView={setView} setLegalTab={setLegalTab}>Retours & Remboursements</PolicyLink></li>
+                <li><PolicyLink view="tracking" setView={setView}>Suivi de commande</PolicyLink></li>
+                <li><PolicyLink tab="shipping" setView={setView} setLegalTab={setLegalTab}>Politique de livraison</PolicyLink></li>
               </ul>
             </div>
             <div>
               <h3 className="font-bold mb-4 dark:text-zinc-100">Vendre sur Eladma</h3>
               <ul className="space-y-2 text-sm text-zinc-500 dark:text-zinc-400">
-                <li className="hover:text-brand cursor-pointer transition-colors" onClick={() => { setView('supplier'); }}>Dashboard Vendeur</li>
-                <li className="hover:text-brand cursor-pointer transition-colors" onClick={() => { setView('cooperatives'); }}>Histoires des Coopératives</li>
-                <li className="hover:text-brand cursor-pointer transition-colors" onClick={() => { setView('legal'); setLegalTab('partners'); }}>Partenariats</li>
-                <li className="hover:text-brand cursor-pointer transition-colors" onClick={() => { setView('legal'); setLegalTab('advertising'); }}>Publicité</li>
+                <li><PolicyLink view="supplier" setView={setView}>Dashboard Vendeur</PolicyLink></li>
+                <li><PolicyLink view="cooperatives" setView={setView}>Histoires des Coopératives</PolicyLink></li>
+                <li><PolicyLink tab="partners" setView={setView} setLegalTab={setLegalTab}>Partenariats</PolicyLink></li>
+                <li><PolicyLink tab="advertising" setView={setView} setLegalTab={setLegalTab}>Publicité</PolicyLink></li>
               </ul>
             </div>
             <div>
               <h3 className="font-bold mb-4 dark:text-zinc-100">Légal</h3>
               <ul className="space-y-2 text-sm text-zinc-500 dark:text-zinc-400">
-                <li className="hover:text-brand cursor-pointer transition-colors" onClick={() => { setView('legal'); setLegalTab('terms'); }}>Conditions d'utilisation</li>
-                <li className="hover:text-brand cursor-pointer transition-colors" onClick={() => { setView('legal'); setLegalTab('privacy'); }}>Confidentialité</li>
-                <li className="hover:text-brand cursor-pointer transition-colors" onClick={() => { setView('legal'); setLegalTab('cookies'); }}>Cookies</li>
+                <li><PolicyLink tab="terms" setView={setView} setLegalTab={setLegalTab}>Conditions d'utilisation</PolicyLink></li>
+                <li><PolicyLink tab="privacy" setView={setView} setLegalTab={setLegalTab}>Confidentialité</PolicyLink></li>
+                <li><PolicyLink tab="cookies" setView={setView} setLegalTab={setLegalTab}>Cookies</PolicyLink></li>
               </ul>
             </div>
           </div>
@@ -1109,6 +1123,20 @@ export default function App() {
         />
       </Suspense>
 
+      <Suspense fallback={null}>
+        <GoogleChatCenter 
+          isOpen={isGoogleChatOpen} 
+          onClose={() => setIsGoogleChatOpen(false)} 
+        />
+      </Suspense>
+
+      <Suspense fallback={null}>
+        <GmailCenter 
+          isOpen={isGmailOpen} 
+          onClose={() => setIsGmailOpen(false)} 
+        />
+      </Suspense>
+
       <ProductModal 
         product={selectedProduct ? (translatedProducts.find(p => p.id === selectedProduct.id) || selectedProduct) : null}
         onClose={() => setSelectedProduct(null)}
@@ -1127,6 +1155,7 @@ export default function App() {
         products={translatedProducts}
         onSelectProduct={setSelectedProduct}
         onAddToCart={addToCart}
+        initialTab={imageSearchTab}
       />
 
       <BottomNav 

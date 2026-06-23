@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, ShoppingCart, User, Menu, Sparkles, Moon, Sun, ArrowRight, Gift, BookOpen, Wifi, WifiOff, Globe, Coins, Heart, Mic, MicOff, Settings, Camera, Bell, Trash2, Check, ShieldCheck, ChevronDown, MessageSquare } from 'lucide-react';
+import { Search, ShoppingCart, User, Menu, Sparkles, Moon, Sun, ArrowRight, Gift, BookOpen, Wifi, WifiOff, Globe, Coins, Heart, Mic, MicOff, Settings, Camera, Image, Bell, Trash2, Check, ShieldCheck, ChevronDown, MessageSquare, Mail } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import { Product } from '../types';
@@ -22,8 +22,9 @@ interface HeaderProps {
   products: Product[];
   onSelectProduct: (product: Product) => void;
   onNavigate: (view: any) => void;
-  onOpenImageSearch?: () => void;
+  onOpenImageSearch?: (tab?: 'camera' | 'qr' | 'upload') => void;
   onOpenGoogleChat?: () => void;
+  onOpenGmail?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({ 
@@ -39,7 +40,8 @@ export const Header: React.FC<HeaderProps> = ({
   onSelectProduct,
   onNavigate,
   onOpenImageSearch,
-  onOpenGoogleChat
+  onOpenGoogleChat,
+  onOpenGmail
 }) => {
   const { language, setLanguage, t } = useLanguage();
   const { currency, setCurrency, formatPrice, exchangeRates, isLive, lastUpdated, refreshRates } = useCurrency();
@@ -171,11 +173,25 @@ export const Header: React.FC<HeaderProps> = ({
     }
   };
 
-  const suggestions = query.length >= 2 
+  // Autocomplete computation based on categories, popular product titles and product records
+  const uniqueCategories = Array.from(new Set(products.map(p => p.category)));
+  
+  const matchedCategories = query.trim().length >= 1
+    ? uniqueCategories.filter(cat => cat.toLowerCase().includes(query.toLowerCase())).slice(0, 3)
+    : [];
+
+  const matchedProductNames = query.trim().length >= 1
+    ? Array.from(new Set(products
+        .filter(p => p.name.toLowerCase().includes(query.toLowerCase()))
+        .map(p => p.name)
+      )).slice(0, 3)
+    : [];
+
+  const matchedProducts = query.trim().length >= 1
     ? products.filter(p => 
         p.name.toLowerCase().includes(query.toLowerCase()) || 
         p.category.toLowerCase().includes(query.toLowerCase())
-      ).slice(0, 5)
+      ).slice(0, 4)
     : [];
 
   useEffect(() => {
@@ -341,7 +357,7 @@ export const Header: React.FC<HeaderProps> = ({
             type="text"
             value={query}
             placeholder={t.searchPlaceholder}
-            className="w-full h-10 pl-4 pr-24 rounded-xl bg-zinc-100 dark:bg-zinc-900 border-2 border-transparent focus:border-brand/20 focus:bg-white dark:focus:bg-zinc-950 transition-all outline-none text-xs dark:text-white shadow-inner"
+            className="w-full h-10 pl-4 pr-[132px] rounded-xl bg-zinc-100 dark:bg-zinc-900 border-2 border-transparent focus:border-brand/20 focus:bg-white dark:focus:bg-zinc-950 transition-all outline-none text-xs dark:text-white shadow-inner"
             onChange={(e) => handleSearchChange(e.target.value)}
             onFocus={() => setShowSuggestions(true)}
             onKeyDown={(e) => {
@@ -352,12 +368,21 @@ export const Header: React.FC<HeaderProps> = ({
               }
             }}
           />
-          {/* Camera Search Button */}
+          {/* File/Image Upload Search Button */}
           <button
             type="button"
-            onClick={() => { haptics.heavy(); onOpenImageSearch?.(); }}
-            className="absolute right-16 top-1/2 -translate-y-1/2 p-1.5 text-zinc-400 hover:text-brand hover:bg-zinc-250 dark:hover:bg-zinc-800 rounded-lg transition-all"
-            title={language === 'en' ? "Search by image" : "Recherche par image"}
+            onClick={() => { haptics.heavy(); onOpenImageSearch?.('upload'); }}
+            className="absolute right-24 top-1/2 -translate-y-1/2 p-1.5 text-zinc-400 hover:text-brand hover:bg-zinc-250 dark:hover:bg-zinc-800 rounded-lg transition-all"
+            title={language === 'en' ? "Search by local photo/file" : "Rechercher par photo d'un article"}
+          >
+            <Image className="w-3.5 h-3.5" />
+          </button>
+          {/* Camera Capture Search Button */}
+          <button
+            type="button"
+            onClick={() => { haptics.heavy(); onOpenImageSearch?.('camera'); }}
+            className="absolute right-16.5 top-1/2 -translate-y-1/2 p-1.5 text-zinc-400 hover:text-brand hover:bg-zinc-250 dark:hover:bg-zinc-800 rounded-lg transition-all"
+            title={language === 'en' ? "Take a photo to search" : "Rechercher en prenant une photo"}
           >
             <Camera className="w-3.5 h-3.5" />
           </button>
@@ -386,38 +411,106 @@ export const Header: React.FC<HeaderProps> = ({
             <Search className="w-3.5 h-3.5" />
           </button>
 
-          {/* Search Suggestions Dropdown */}
+          {/* Search Autocomplete Suggestions Dropdown */}
           <AnimatePresence>
-            {showSuggestions && suggestions.length > 0 && (
+            {showSuggestions && (matchedCategories.length > 0 || matchedProductNames.length > 0 || matchedProducts.length > 0) && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 10 }}
-                className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-zinc-900 border dark:border-zinc-800 rounded-xl shadow-2xl overflow-hidden p-2 z-[60]"
+                className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-zinc-900 border dark:border-zinc-800 rounded-2xl shadow-2xl overflow-hidden p-3 z-[60] w-[420px] max-w-[100vw] sm:w-full space-y-3"
               >
-                <div className="px-3 py-1.5 text-[10px] font-bold text-zinc-450 uppercase tracking-widest border-b dark:border-zinc-800 mb-1.5">
-                  Suggestions de produits
-                </div>
-                {suggestions.map((product) => (
-                  <button
-                    key={product.id}
-                    onClick={() => {
-                      onSelectProduct(product);
-                      setShowSuggestions(false);
-                      setQuery('');
-                    }}
-                    className="w-full flex items-center gap-3 p-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-lg transition-colors text-left group/item"
-                  >
-                    <div className="w-8 h-8 rounded-md overflow-hidden flex-shrink-0 bg-zinc-100">
-                      <img src={product.image} alt={product.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                {/* 1. SECTION: CATEGORIES */}
+                {matchedCategories.length > 0 && (
+                  <div>
+                    <div className="px-3 py-1 text-[10px] font-black text-brand uppercase tracking-wider mb-1 flex items-center gap-1">
+                      <Globe className="w-3 h-3 text-brand" />
+                      <span>{language === 'en' ? 'Suggested Categories' : 'Catégories Suggérées'}</span>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold dark:text-zinc-100 truncate group-hover/item:text-brand transition-colors">{product.name}</p>
-                      <p className="text-[10px] text-zinc-500">{product.category} • {formatPrice(product.price)}</p>
+                    <div className="flex flex-wrap gap-1.5 p-1">
+                      {matchedCategories.map((cat) => (
+                        <button
+                          key={cat}
+                          onClick={() => {
+                            haptics.light();
+                            sounds.click();
+                            setQuery(cat);
+                            onSearch(cat);
+                            setShowSuggestions(false);
+                          }}
+                          className="px-2.5 py-1.5 text-xs bg-zinc-50 hover:bg-brand/5 dark:bg-zinc-800 dark:hover:bg-brand/10 text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 hover:border-brand dark:hover:border-brand/40 rounded-lg transition-all text-left flex items-center gap-1.5 font-bold"
+                        >
+                          <BookOpen className="w-3 h-3 text-zinc-450 shrink-0" />
+                          <span>{cat}</span>
+                        </button>
+                      ))}
                     </div>
-                    <ArrowRight className="w-3.5 h-3.5 text-zinc-300 opacity-0 group-hover/item:opacity-100 group-hover/item:translate-x-1 transition-all" />
-                  </button>
-                ))}
+                  </div>
+                )}
+
+                {/* 2. SECTION: POPULAR PRODUCT NAMES */}
+                {matchedProductNames.length > 0 && (
+                  <div>
+                    <div className="px-3 py-1 text-[10px] font-black text-brand uppercase tracking-wider mb-1 flex items-center gap-1">
+                      <Sparkles className="w-3 h-3 text-brand" />
+                      <span>{language === 'en' ? 'Popular Searches' : 'Recherches Suggérées'}</span>
+                    </div>
+                    <div className="space-y-0.5">
+                      {matchedProductNames.map((name) => (
+                        <button
+                          key={name}
+                          onClick={() => {
+                            haptics.light();
+                            sounds.click();
+                            setQuery(name);
+                            onSearch(name);
+                            setShowSuggestions(false);
+                          }}
+                          className="w-full text-left px-3 py-1.5 text-xs text-zinc-650 dark:text-zinc-350 hover:text-brand dark:hover:text-brand hover:bg-zinc-50 dark:hover:bg-zinc-805 rounded-lg transition-all flex items-center gap-2"
+                        >
+                          <Search className="w-3 h-3 text-zinc-450 shrink-0" />
+                          <span className="truncate">{name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. SECTION: DETAILED PRODUCT MATCHES */}
+                {matchedProducts.length > 0 && (
+                  <div>
+                    <div className="px-3 py-1 text-[10px] font-black text-brand uppercase tracking-wider mb-1.5 flex items-center gap-1 border-t dark:border-zinc-800 pt-2.5">
+                      <Search className="w-3 h-3 text-brand" />
+                      <span>{language === 'en' ? 'Product Matches' : 'Articles Correspondants'}</span>
+                    </div>
+                    <div className="space-y-1 max-h-56 overflow-y-auto no-scrollbar">
+                      {matchedProducts.map((product) => (
+                        <button
+                          key={product.id}
+                          onClick={() => {
+                            haptics.heavy();
+                            sounds.select();
+                            onSelectProduct(product);
+                            setShowSuggestions(false);
+                            setQuery('');
+                          }}
+                          className="w-full flex items-center gap-3 p-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-xl transition-all text-left group/item"
+                        >
+                          <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 bg-zinc-100 border border-zinc-150 dark:border-zinc-800">
+                            <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover/item:scale-105 transition-transform" referrerPolicy="no-referrer" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-black dark:text-zinc-100 truncate group-hover/item:text-brand transition-colors">{product.name}</p>
+                            <p className="text-[10px] text-zinc-500 font-medium">
+                              {product.category} • <span className="font-bold text-brand">{formatPrice(product.price)}</span>
+                            </p>
+                          </div>
+                          <ArrowRight className="w-3.5 h-3.5 text-brand opacity-0 -translate-x-1 group-hover/item:opacity-100 group-hover/item:translate-x-0 transition-all shrink-0" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
@@ -524,11 +617,20 @@ export const Header: React.FC<HeaderProps> = ({
             </AnimatePresence>
           </div>
 
-          {/* Mobile Image search camera shortcut */}
+          {/* Mobile Image search local photo file shortcut */}
           <button 
-            onClick={() => { haptics.medium(); onOpenImageSearch?.(); }}
-            className="md:hidden p-1.5 text-zinc-600 dark:text-zinc-400 hover:text-brand"
-            title="Recherche par image"
+            onClick={() => { haptics.medium(); onOpenImageSearch?.('upload'); }}
+            className="md:hidden p-1.5 text-zinc-650 dark:text-zinc-400 hover:text-brand"
+            title="Rechercher par photo d'un article"
+          >
+            <Image className="w-5 h-5" />
+          </button>
+
+          {/* Mobile Image search live camera shortcut */}
+          <button 
+            onClick={() => { haptics.medium(); onOpenImageSearch?.('camera'); }}
+            className="md:hidden p-1.5 text-zinc-650 dark:text-zinc-400 hover:text-brand"
+            title="Prendre une photo pour chercher"
           >
             <Camera className="w-5 h-5" />
           </button>
@@ -651,6 +753,15 @@ export const Header: React.FC<HeaderProps> = ({
             title="Centre de Discussion Google Chat"
           >
             <MessageSquare className="w-5 h-5 text-orange-600 dark:text-orange-400 animate-pulse" />
+          </button>
+
+          {/* Google Gmail Center Toggle */}
+          <button 
+            onClick={() => { haptics.light(); sounds.click(); onOpenGmail?.(); }}
+            className="p-1.5 text-zinc-600 dark:text-zinc-400 hover:text-brand hover:scale-105 transition-all relative"
+            title="Centre Messageries Gmail"
+          >
+            <Mail className="w-5 h-5 text-orange-600 dark:text-orange-400 animate-pulse" />
           </button>
 
           {/* User Profile Shortcut Icon */}

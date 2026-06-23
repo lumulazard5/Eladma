@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Star, 
@@ -11,7 +11,15 @@ import {
   ThumbsUp, 
   Quote, 
   Lock,
-  UserCheck
+  UserCheck,
+  RefreshCw,
+  Sliders,
+  Globe,
+  Building,
+  Check,
+  ExternalLink,
+  ShieldCheck,
+  AlertCircle
 } from 'lucide-react';
 import { haptics } from '../services/haptics';
 import { sounds } from '../services/sound';
@@ -67,7 +75,7 @@ const INITIAL_TESTIMONIALS: Testimonial[] = [
     rating: 5,
     date: "Il y a 2 semaines",
     productBought: "Ordinateur ThinkPad Reconditionné",
-    text: "Sur AliExpress ou Amazon, pas de Mobile Money M-Pesa. Pour Eladma, j'ai tout réglé instantanément avec mon solde Orange Money. Le prix final intégrait déjà les frais de vol cargo intérieur. La transparence totale, sans taxe surprise au dépôt de Goma.",
+    text: "Eladma est d'une grande fluidité avec l'intégration narrative et native de Mobile Money. J'ai réglé mon achat de manière instantanée avec mon solde Orange Money. Le prix final affiché comprenait déjà l'ensemble des frais de logistique et de vol cargo intérieur. La transparence est totale, sans aucune taxe surprise lors du retrait de mon colis à Goma.",
     verified: true,
     avatarSeed: "emmanuel",
     category: "Électronique",
@@ -106,6 +114,124 @@ export const CustomerTestimonials: React.FC = () => {
   const [selectedCity, setSelectedCity] = useState<CityType>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [likes, setLikes] = useState<Record<string, number>>({});
+
+  const [activeTab, setActiveTab] = useState<'local' | 'google'>('local');
+
+  // Google Reviews State
+  interface GoogleReview {
+    id: string;
+    authorName: string;
+    rating: number;
+    relativeTime: string;
+    text: string;
+    profilePhotoUrl?: string;
+    verified?: boolean;
+  }
+
+  const [googleReviews, setGoogleReviews] = useState<GoogleReview[]>([]);
+  const [googleProfile, setGoogleProfile] = useState<{
+    displayName: string;
+    formattedAddress: string;
+    rating: number;
+    isDemo: boolean;
+  } | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [lastSynced, setLastSynced] = useState<string | null>(() => localStorage.getItem('eladma_gbp_last_synced'));
+  const [googlePlaceId, setGooglePlaceId] = useState(() => localStorage.getItem('eladma_gbp_place_id') || '');
+  const [customApiKey, setCustomApiKey] = useState(() => localStorage.getItem('eladma_gbp_custom_key') || '');
+  const [showConfig, setShowConfig] = useState(false);
+
+  // Load cached google reviews on mount
+  useEffect(() => {
+    const cachedData = localStorage.getItem('eladma_gbp_cached_data');
+    if (cachedData) {
+      try {
+        const parsed = JSON.parse(cachedData);
+        setGoogleReviews(parsed.reviews || []);
+        if (parsed.displayName) {
+          setGoogleProfile({
+            displayName: parsed.displayName,
+            formattedAddress: parsed.formattedAddress || '',
+            rating: parsed.rating || 5,
+            isDemo: parsed.isDemo !== undefined ? parsed.isDemo : true
+          });
+        }
+      } catch (e) {
+        console.error('Failed to parse cached Google Reviews', e);
+      }
+    } else {
+      // Fetch default/initial Google reviews
+      fetchGoogleReviews(true);
+    }
+  }, []);
+
+  const fetchGoogleReviews = async (isInitial = false) => {
+    if (!isInitial) {
+      setIsSyncing(true);
+      haptics.heavy();
+      sounds.select();
+    }
+    try {
+      const queryParams = new URLSearchParams();
+      if (googlePlaceId) queryParams.append('placeId', googlePlaceId);
+      if (customApiKey) queryParams.append('apiKey', customApiKey);
+
+      const response = await fetch(`/api/google-business/reviews?${queryParams.toString()}`);
+      if (!response.ok) {
+        throw new Error(`Syntax Error: ${response.statusText}`);
+      }
+      const data = await response.json();
+      if (data.error) {
+        toast.error(data.error);
+        return;
+      }
+
+      setGoogleReviews(data.reviews || []);
+      setGoogleProfile({
+        displayName: data.displayName,
+        formattedAddress: data.formattedAddress,
+        rating: data.rating,
+        isDemo: data.isDemo
+      });
+
+      const nowStr = new Date().toLocaleString('fr-FR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+      setLastSynced(nowStr);
+      localStorage.setItem('eladma_gbp_last_synced', nowStr);
+      localStorage.setItem('eladma_gbp_cached_data', JSON.stringify(data));
+
+      if (!isInitial) {
+        toast.success(
+          data.isDemo 
+            ? "Mode Démo activé ! Avis synchronisés virtuellement." 
+            : "Synchronisation réussie avec Google Business Profile !"
+        );
+      }
+    } catch (err: any) {
+      console.error(err);
+      if (!isInitial) {
+        toast.error("Erreur de synchronisation avec l'API Google Business.");
+      }
+    } finally {
+      if (!isInitial) {
+        setIsSyncing(false);
+      }
+    }
+  };
+
+  const handleSaveConfig = () => {
+    haptics.medium();
+    localStorage.setItem('eladma_gbp_place_id', googlePlaceId);
+    localStorage.setItem('eladma_gbp_custom_key', customApiKey);
+    toast.success("Configuration sauvegardée. Lancement de la synchronisation...");
+    setShowConfig(false);
+    fetchGoogleReviews(false);
+  };
 
   // Form states
   const [newName, setNewName] = useState('');
@@ -195,7 +321,43 @@ export const CustomerTestimonials: React.FC = () => {
         </button>
       </div>
 
-      {/* Filter by City pill selection */}
+      {/* Tab Switcher */}
+      <div className="flex border-b border-zinc-200/60 dark:border-zinc-800/80 mb-8 p-1 bg-zinc-50 dark:bg-zinc-850 rounded-2xl max-w-sm">
+        <button
+          onClick={() => {
+            haptics.light();
+            setActiveTab('local');
+          }}
+          className={`flex-1 py-3 text-center rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+            activeTab === 'local'
+              ? 'bg-white dark:bg-zinc-900 text-brand shadow-sm border border-zinc-200/55 dark:border-zinc-805'
+              : 'text-zinc-500 hover:text-zinc-850 dark:hover:text-zinc-250'
+          }`}
+        >
+          <span className="flex items-center justify-center gap-2">
+            <UserCheck className="w-3.5 h-3.5" /> Avis RDC Eladma
+          </span>
+        </button>
+        <button
+          onClick={() => {
+            haptics.light();
+            setActiveTab('google');
+          }}
+          className={`flex-1 py-3 text-center rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+            activeTab === 'google'
+              ? 'bg-white dark:bg-zinc-900 text-amber-500 shadow-sm border border-zinc-200/55 dark:border-zinc-805'
+              : 'text-zinc-500 hover:text-zinc-850 dark:hover:text-zinc-250'
+          }`}
+        >
+          <span className="flex items-center justify-center gap-2">
+            <Globe className="w-3.5 h-3.5 text-amber-500 animate-pulse" /> Google Business Sync
+          </span>
+        </button>
+      </div>
+
+      {activeTab === 'local' && (
+        <>
+          {/* Filter by City pill selection */}
       <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-none mb-6">
         {(['all', 'Kinshasa', 'Lubumbashi', 'Goma', 'Kananga', 'Mbuji-Mayi'] as CityType[]).map((city) => (
           <button
@@ -309,6 +471,245 @@ export const CustomerTestimonials: React.FC = () => {
           </div>
         )}
       </div>
+        </>
+      )}
+
+      {/* Google Business Profile Sync Panel */}
+      {activeTab === 'google' && (
+        <div className="mb-10 text-left">
+          {/* Status Dashboard Header */}
+          <div className="p-6 sm:p-8 bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-zinc-800/80 rounded-[2.5rem] flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8 shadow-sm">
+            <div className="flex gap-4 items-start pb-2">
+              {/* Google Emblem / Branding */}
+              <div className="w-14 h-14 rounded-2xl bg-white dark:bg-zinc-800 border border-zinc-250/20 shadow-sm flex items-center justify-center font-black text-2xl text-zinc-900 dark:text-white shrink-0 selection:bg-transparent">
+                <span className="bg-gradient-to-r from-blue-500 via-red-500 to-yellow-500 bg-clip-text text-transparent">G</span>
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-extrabold text-sm sm:text-base dark:text-white">
+                    {googleProfile?.displayName || "Google Business Profile"}
+                  </h3>
+                  {googleProfile?.isDemo ? (
+                    <span className="text-[9px] bg-amber-500/15 text-amber-600 dark:text-amber-400 font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                      Mode Démo
+                    </span>
+                  ) : (
+                    <span className="text-[9px] bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
+                      <ShieldCheck className="w-3" /> Connecté au GBP Réel
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-zinc-550 dark:text-zinc-400 mt-1 max-w-md">
+                  {googleProfile?.formattedAddress || "Boulevard du 30 Juin, Gombe, Kinshasa, RDC"}
+                </p>
+                <div className="flex items-center gap-2 mt-2 flex-wrap font-sans">
+                  <div className="flex items-center text-amber-500 mt-0.5">
+                    {[...Array(5)].map((_, i) => (
+                      <Star key={i} className="w-3.5 h-3.5 fill-current" />
+                    ))}
+                  </div>
+                  <span className="text-xs font-black text-zinc-700 dark:text-zinc-350">
+                    {googleProfile?.rating || "4.9"}/5.0
+                  </span>
+                  <span className="text-zinc-350 dark:text-zinc-650 font-bold text-xs">•</span>
+                  <span className="text-[10px] text-zinc-400 font-semibold italic">
+                    Dernière synchronisation : {lastSynced || "Jamais"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Sync actions */}
+            <div className="flex gap-3 w-full md:w-auto">
+              <button
+                type="button"
+                onClick={() => fetchGoogleReviews(false)}
+                disabled={isSyncing}
+                className="flex-1 md:flex-initial inline-flex items-center justify-center gap-2 px-5 py-3.5 bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-950 font-black rounded-xl text-xs uppercase tracking-wider shadow-md transition-all cursor-pointer disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 shrink-0 ${isSyncing ? "animate-spin" : ""}`} />
+                <span>{isSyncing ? "Synchronisation..." : "Synchroniser maintenant"}</span>
+              </button>
+              
+              <button
+                type="button"
+                onClick={() => {
+                  haptics.light();
+                  setShowConfig(!showConfig);
+                }}
+                className="inline-flex items-center justify-center p-3.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-750 hover:bg-zinc-50 dark:hover:bg-zinc-700 text-zinc-750 dark:text-zinc-300 font-bold rounded-xl transition-all cursor-pointer"
+                title="Configurer l'API et le Place ID"
+              >
+                <Sliders className="w-4 h-4 shrink-0" />
+              </button>
+            </div>
+          </div>
+
+          {/* Config form inside an expandable smooth container */}
+          <AnimatePresence>
+            {showConfig && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden mb-8"
+              >
+                <div className="p-6 bg-zinc-50 dark:bg-zinc-805/60 border border-zinc-200/80 dark:border-zinc-800/80 rounded-[2rem] space-y-4">
+                  <div className="flex items-start gap-2 text-zinc-750 dark:text-zinc-300">
+                    <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-amber-500" />
+                    <div>
+                      <h4 className="font-extrabold text-xs uppercase tracking-wider text-brand">Liaison Google Places API de votre Compte Développeur</h4>
+                      <p className="text-[11px] mt-0.5 leading-relaxed opacity-95">
+                        Puisque vous possédez un compte développeur, vous pouvez ici lier votre propre clé API Google Cloud et l'identifiant unique (Place ID) de votre boutique physique ou de votre profil d'établissement en RDC pour synchroniser en temps réel vos vrais avis Google Business.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest block">Google Place ID (Laisser vide pour utiliser le défaut)</label>
+                      <input
+                        type="text"
+                        placeholder="Ex: ChIJu6Hq1vHjXhERpE92lD2T3_I"
+                        value={googlePlaceId}
+                        onChange={(e) => setGooglePlaceId(e.target.value)}
+                        className="w-full bg-white dark:bg-zinc-900 border border-zinc-250/20 dark:border-zinc-705 rounded-xl p-3 outline-none text-xs text-zinc-800 dark:text-white font-medium focus:ring-2 focus:ring-brand"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest block">Clé API Google Maps/Places (Optionnel)</label>
+                      <input
+                        type="password"
+                        placeholder="Ex: AIzaSyD..."
+                        value={customApiKey}
+                        onChange={(e) => setCustomApiKey(e.target.value)}
+                        className="w-full bg-white dark:bg-zinc-900 border border-zinc-250/20 dark:border-zinc-705 rounded-xl p-3 outline-none text-xs text-zinc-800 dark:text-white font-medium focus:ring-2 focus:ring-brand"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-center pt-2 gap-4 flex-wrap">
+                    <a 
+                      href="https://developers.google.com/maps/documentation/places/web-service/place-id" 
+                      target="_blank" 
+                      rel="referrer" 
+                      className="text-[10px] font-bold text-brand hover:underline flex items-center gap-1 cursor-pointer"
+                    >
+                      Comment trouver mon Place ID ? <ExternalLink className="w-3 h-3" />
+                    </a>
+                    
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setGooglePlaceId('');
+                          setCustomApiKey('');
+                          localStorage.removeItem('eladma_gbp_place_id');
+                          localStorage.removeItem('eladma_gbp_custom_key');
+                          toast.success("Configuration réinitialisée");
+                          setShowConfig(false);
+                          fetchGoogleReviews(false);
+                        }}
+                        className="px-4 py-2 bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-extrabold text-[10px] uppercase tracking-wider rounded-lg hover:opacity-80 transition-all cursor-pointer"
+                      >
+                        Réinitialiser par défaut
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSaveConfig}
+                        className="px-4 py-2 bg-brand text-white font-extrabold text-[10px] uppercase tracking-wider rounded-lg hover:opacity-90 transition-all cursor-pointer"
+                      >
+                        Enregistrer & Synchroniser
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Google Reviews Bento Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <AnimatePresence mode="popLayout">
+              {googleReviews.map((rev) => (
+                <motion.div
+                  key={rev.id}
+                  layout
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  className="bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800/80 p-6 rounded-[2rem] flex flex-col justify-between shadow-sm hover:shadow-md transition-all relative overflow-hidden text-left"
+                >
+                  <div className="absolute top-4 right-6 select-none opacity-[0.03] dark:opacity-[0.05] pointer-events-none">
+                    <span className="font-black text-6xl text-zinc-900 dark:text-white select-none">G</span>
+                  </div>
+
+                  <div>
+                    {/* Header author details */}
+                    <div className="flex items-center gap-3 mb-4 font-sans">
+                      {rev.profilePhotoUrl ? (
+                        <img 
+                          src={rev.profilePhotoUrl} 
+                          alt={rev.authorName}
+                          className="w-10 h-10 rounded-full object-cover border border-zinc-200"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-zinc-100 text-zinc-650 flex items-center justify-center font-black uppercase text-xs">
+                          {rev.authorName.charAt(0)}
+                        </div>
+                      )}
+                      <div>
+                        <h4 className="font-extrabold text-xs dark:text-white flex items-center gap-1.5 leading-tight">
+                          {rev.authorName}
+                          <span className="text-[9px] inline-flex items-center gap-0.5 text-blue-500 font-extrabold uppercase bg-blue-500/10 px-1.5 py-0.5 rounded-full select-none">
+                            Google certifié
+                          </span>
+                        </h4>
+                        <p className="text-[10px] text-zinc-400 font-semibold mt-0.5">
+                          {rev.relativeTime}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Stars */}
+                    <div className="flex items-center gap-0.5 mb-3">
+                      {[...Array(5)].map((_, i) => (
+                        <Star 
+                          key={i} 
+                          className={`w-3.5 h-3.5 ${i < rev.rating ? 'text-amber-500 fill-amber-500' : 'text-zinc-200 dark:text-zinc-850'}`} 
+                        />
+                      ))}
+                    </div>
+
+                    {/* Review text */}
+                    <p className="text-[11px] text-zinc-650 dark:text-zinc-300 leading-relaxed font-semibold italic mb-2">
+                      "{rev.text}"
+                    </p>
+                  </div>
+
+                  {/* Trust footer badge */}
+                  <div className="border-t border-zinc-100 dark:border-zinc-850 pt-3 mt-3 flex items-center justify-between text-zinc-400 text-[10px] font-sans">
+                    <span className="flex items-center gap-1 text-[9px] font-black uppercase text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-md">
+                      <ShieldCheck className="w-3.5 h-3.5" /> Avis Vérifié
+                    </span>
+                    <span className="text-[9px] font-bold text-zinc-400 dark:text-zinc-550 flex items-center gap-1 select-none">
+                      Source Google maps
+                    </span>
+                  </div>
+                </motion.div>
+              ))}
+
+              {googleReviews.length === 0 && (
+                <div className="col-span-full h-48 bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800/80 rounded-[2rem] flex flex-col items-center justify-center text-zinc-400 gap-3">
+                  <RefreshCw className="w-10 h-10 opacity-30 animate-spin text-zinc-500" />
+                  <p className="text-xs font-bold">Chargement des avis Google Business Profile...</p>
+                </div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+      )}
 
       {/* Modern Dialog/Modal Backdrop & Form */}
       <AnimatePresence>

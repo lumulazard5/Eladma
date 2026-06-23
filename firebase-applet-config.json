@@ -1,10 +1,9 @@
 {
   "projectId": "rdc-express",
   "appId": "1:483127967992:web:64d8e12271ef6c5e427b0d",
-  "apiKey": "AIzaSyCiP05QxQKXkyvX2eALsc1RXKUWaAuUs80",
+  "apiKey": "AIzaSyB-2L4iPD5fAW2ZwGk-1iHsojtA_iqaCdc",
   "authDomain": "rdc-express.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-8bf9b993-410f-42f7-9f05-467e20feabe6",
   "storageBucket": "rdc-express.firebasestorage.app",
   "messagingSenderId": "483127967992",
-  "measurementId": ""
+  "measurementId": "G-14DXSNL5M7"
 }

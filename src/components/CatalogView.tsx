@@ -11,6 +11,7 @@ import {
   Star, 
   Heart, 
   Camera, 
+  Image,
   X, 
   SlidersHorizontal, 
   ArrowUpDown, 
@@ -41,7 +42,7 @@ interface CatalogViewProps {
   onFiltersChange: (filters: ProductFilters) => void;
   searchQuery: string;
   onSearchQueryChange: (query: string) => void;
-  onOpenImageSearch?: () => void;
+  onOpenImageSearch?: (tab?: 'camera' | 'qr' | 'upload') => void;
 }
 
 const CATEGORIES: Category[] = ['All', 'Artisanat', 'Electronics', 'Fashion', 'Home', 'Beauty', 'Sports', 'Furniture', 'Automotive'];
@@ -325,17 +326,27 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                   haptics.light();
                   onSearchQueryChange(e.target.value);
                 }}
-                className="w-full pl-10 pr-10 py-3 bg-zinc-50 dark:bg-zinc-950 text-xs font-bold rounded-xl border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-brand"
+                className="w-full pl-10 pr-[78px] py-3 bg-zinc-50 dark:bg-zinc-950 text-xs font-bold rounded-xl border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-brand"
               />
               <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <button
-                type="button"
-                onClick={() => { haptics.heavy(); onOpenImageSearch?.(); }}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-brand transition-colors p-1.5 rounded hover:bg-zinc-200 dark:hover:bg-zinc-800"
-                title="Déclencher une recherche par IA visuelle"
-              >
-                <Camera className="w-4 h-4" />
-              </button>
+              <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => { haptics.heavy(); onOpenImageSearch?.('upload'); }}
+                  className="text-zinc-400 hover:text-brand transition-colors p-1.5 rounded hover:bg-zinc-200 dark:hover:bg-zinc-800"
+                  title="Rechercher par photo d'un article"
+                >
+                  <Image className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { haptics.heavy(); onOpenImageSearch?.('camera'); }}
+                  className="text-zinc-400 hover:text-brand transition-colors p-1.5 rounded hover:bg-zinc-200 dark:hover:bg-zinc-800"
+                  title="Rechercher en prenant une photo"
+                >
+                  <Camera className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
             {/* Recent Searches Subsystem */}
